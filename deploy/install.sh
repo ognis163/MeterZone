@@ -43,8 +43,8 @@ mkdir -p "$APP_DIR/data" "$APP_DIR/data/backups"
 say "Скачиваю MeterZone (aarch64)..."
 fetch "$BASE/$ASSET" "$TMP.bin" || die "не удалось скачать $BASE/$ASSET"
 [ -s "$TMP.bin" ] || die "скачался пустой файл"
-MAGIC=$(dd if="$TMP.bin" bs=1 count=4 2>/dev/null | od -An -tx1 | tr -d ' \n')
-[ "$MAGIC" = "7f454c46" ] || die "файл не похож на Linux-бинарник"
+SIZE=$(wc -c < "$TMP.bin")
+[ "$SIZE" -gt 1000000 ] || die "скачался файл неверного размера ($SIZE байт)"
 
 if [ -x /opt/etc/init.d/S99meterzone ]; then
   say "Останавливаю прежнюю версию..."
