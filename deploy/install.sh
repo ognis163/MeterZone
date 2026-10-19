@@ -1,6 +1,6 @@
 #!/bin/sh
 # MeterZone — установка на Keenetic / Entware (aarch64) одной командой.
-# Запуск: curl -fsSL https://raw.githubusercontent.com/ognis163/MeterZone/main/deploy/install.sh | sh
+# Запуск: curl -fsSL https://raw.githubusercontent.com/ognis163/MeterZone/refs/heads/main/deploy/install.sh | sh
 set -eu
 
 APP_DIR=/opt/meterzone

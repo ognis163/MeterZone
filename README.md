@@ -76,7 +76,7 @@ go build -trimpath -ldflags "-s -w" -o meterzone .
 На Keenetic с Entware, по SSH под root:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ognis163/MeterZone/main/deploy/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ognis163/MeterZone/refs/heads/main/deploy/install.sh | sh
 ```
 
 Скрипт скачает последний релиз для aarch64, установит его в `/opt/meterzone`,
@@ -86,7 +86,7 @@ curl -fsSL https://raw.githubusercontent.com/ognis163/MeterZone/main/deploy/inst
 Другой порт:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ognis163/MeterZone/main/deploy/install.sh | PORT=8090 sh
+curl -fsSL https://raw.githubusercontent.com/ognis163/MeterZone/refs/heads/main/deploy/install.sh | PORT=8090 sh
 ```
 
 Нужен Keenetic Hopper (aarch64) с Entware и доступом в интернет.
