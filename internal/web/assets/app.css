@@ -1935,3 +1935,6 @@ input:disabled, select:disabled { opacity: .55; cursor: not-allowed; }
 @media (max-width: 759px) {
   .report-actions .preview-actions .btn { flex: 1 1 auto; }
 }.about-by { margin: 10px 0 0; font-size: 12px; font-weight: 600; color: var(--ink); letter-spacing: -.01em; }
+/* PWA / iOS: не отдаём горизонтальный жест браузеру на полосах */
+html, body { overscroll-behavior-x: none; }
+.object-seg, .month-strip, .month-strip-months, .jrange, .jrange-seg, .jtable-wrap, .object-list { overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
