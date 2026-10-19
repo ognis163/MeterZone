@@ -1,5 +1,6 @@
 # Build artifacts
 *.exe
+*.exe~
 *.test
 *.out
 meterzone

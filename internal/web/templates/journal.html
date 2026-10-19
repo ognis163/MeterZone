@@ -40,6 +40,7 @@
 </section>
 {{end}}
 
+{{if .HasMonths}}
 <section class="panel j-summary">
   <div class="section-head">
     <h2>Итоги за {{.RangeLabel}}</h2>
@@ -98,6 +99,7 @@
   <p class="hint jscroll-hint">На телефоне таблицу можно прокручивать вбок.</p>
   <p class="hint">Показание — счётчик на конец месяца, расход — сколько израсходовано за месяц. Нажмите на месяц, чтобы внести или исправить данные.</p>
 </section>
+{{end}}
 
 {{if .MoneyAny}}
 <section class="panel money-summary">

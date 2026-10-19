@@ -420,6 +420,14 @@ func (s *Server) handleMeterArchive(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, http.StatusNotFound, "Прибор не найден", "Возможно, он был удалён.")
 		return
 	}
+	active, _ := s.Store.Meters(m.ObjectID, false)
+	for _, c := range active {
+		if c.ParentID == id {
+			s.fail(w, http.StatusBadRequest, "Нельзя в архив",
+				"Сначала отвяжите дублирующий счётчик «"+c.Title()+"» или архивируйте его.")
+			return
+		}
+	}
 	if err := s.Store.ArchiveMeter(id); err != nil {
 		s.fail(w, http.StatusInternalServerError, "Ошибка", "Не удалось архивировать прибор.")
 		return
