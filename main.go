@@ -22,7 +22,7 @@ import (
 	WebCl "indextro/internal/web"
 )
 
-const version = "2.3.0"
+const version = "1.0"
 
 //go:embed DejaVuSans.ttf
 var fontBytes []byte
