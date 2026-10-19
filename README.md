@@ -6,6 +6,25 @@
 
 MeterZone by OGNIS.
 
+## Скриншоты
+
+**Компьютер**
+
+| Показания | Журнал |
+| --- | --- |
+| ![Показания на компьютере](docs/screens/home-desktop.png) | ![Журнал на компьютере](docs/screens/journal-desktop.png) |
+
+| Отчёты | Объект и приборы |
+| --- | --- |
+| ![Отчёты на компьютере](docs/screens/reports-desktop.png) | ![Объект и приборы](docs/screens/object-form-desktop.png) |
+
+**Телефон**
+
+<p align="center">
+  <img src="docs/screens/home-mobile.png" width="300" alt="Показания на телефоне">
+  <img src="docs/screens/reports-mobile.png" width="300" alt="Отчёты на телефоне">
+</p>
+
 ## Что умеет
 
 - **Объекты** — дома, магазины, офисы: собственник, адрес, лицевые счета, почта водоканала и энергосбыта.
