@@ -94,26 +94,6 @@
     if (e) e.textContent = hasEnergy ? fmt(energy) : "0";
   }
 
-  function recalcMoney() {
-    qa("[data-money-row]").forEach(function (row) {
-      var acc = row.getAttribute("data-account");
-      var c = q("[data-charged='" + acc + "']", row);
-      var a = q("[data-advance='" + acc + "']", row);
-      var flag = q("[data-paid-flag='" + acc + "']", row);
-      var btn = q("[data-paid-toggle='" + acc + "']", row);
-      var paidNow = (btn && btn.classList.contains("is-paid")) || (flag && flag.value === "1");
-      var charged = c ? parseVal(c.value) || 0 : 0;
-      var advance = a ? parseVal(a.value) || 0 : 0;
-      if (flag) flag.value = paidNow ? "1" : "";
-      if (btn) {
-        btn.classList.toggle("is-paid", paidNow);
-        btn.classList.toggle("is-unpaid", !paidNow);
-        btn.textContent = paidNow ? "Оплачено" : "Оплатить";
-        btn.setAttribute("aria-pressed", paidNow ? "true" : "false");
-      }
-    });
-  }
-
   // ---------- автосохранение ----------
   var entryForm = q("form[data-entry]");
   var statusBox = q("[data-autosave-status] .savebar-status");
