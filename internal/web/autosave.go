@@ -93,6 +93,12 @@ func (s *Server) handleAutoSave(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	if next, _, hasNext := report.NextReading(readings[meter.ID], period); hasNext && val > next {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error": "больше следующего показания " + model.FormatValue(next),
+		})
+		return
+	}
 	if err := s.Store.SaveReading(meter.ID, period.String(), val, ""); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "не удалось сохранить"})
 		return

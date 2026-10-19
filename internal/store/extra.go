@@ -63,8 +63,10 @@ func (s *Store) Stats() Stats {
 	_ = s.db.QueryRow(`SELECT COUNT(*) FROM meters WHERE archived = 0`).Scan(&st.Meters)
 	_ = s.db.QueryRow(`SELECT COUNT(*) FROM readings`).Scan(&st.Readings)
 	_ = s.db.QueryRow(`SELECT COUNT(*) FROM money`).Scan(&st.Money)
-	if info, err := os.Stat(s.path); err == nil {
-		st.DBBytes = info.Size()
+	for _, suffix := range []string{"", "-wal"} {
+		if info, err := os.Stat(s.path + suffix); err == nil {
+			st.DBBytes += info.Size()
+		}
 	}
 	_ = s.db.QueryRow(`SELECT COALESCE(MIN(period), ''), COALESCE(MAX(period), '') FROM readings`).
 		Scan(&st.Oldest, &st.Newest)

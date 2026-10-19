@@ -87,6 +87,7 @@ func (s *Store) SeedDemo() error {
 				Label:          sm.label,
 				Brand:          sm.brand,
 				Serial:         sm.serial,
+				StartValue:     sm.base,
 				Sort:           i + 1,
 				FinanceEnabled: true,
 			}
@@ -108,13 +109,14 @@ func (s *Store) SeedDemo() error {
 		// Суб-счётчик холодной воды у первого объекта.
 		if oi == 0 && firstCold != 0 {
 			child := model.Meter{
-				ObjectID: obj.ID,
-				Resource: model.WaterCold,
-				Label:    "Полив, суб-счётчик",
-				Brand:    "СВК-15",
-				Serial:   "118499",
-				ParentID: firstCold,
-				Sort:     4,
+				ObjectID:   obj.ID,
+				Resource:   model.WaterCold,
+				Label:      "Полив, суб-счётчик",
+				Brand:      "СВК-15",
+				Serial:     "118499",
+				StartValue: 36,
+				ParentID:   firstCold,
+				Sort:       4,
 			}
 			if err := s.SaveMeter(&child); err != nil {
 				return err

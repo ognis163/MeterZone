@@ -79,3 +79,26 @@ func TestReportsPreviewUsesResourceNames(t *testing.T) {
 		t.Fatal("в предпросмотре остались названия точек установки")
 	}
 }
+
+func TestParseMoneyRejectsNaN(t *testing.T) {
+	for _, raw := range []string{"NaN", "nan", "+Inf", "-Inf", "Infinity"} {
+		if _, err := parseMoney(raw); err == nil {
+			t.Fatalf("%q принят как сумма", raw)
+		}
+	}
+}
+
+func TestJournalMoneyRowsDebt(t *testing.T) {
+	rows := moneyRowsFrom(map[model.Account]model.Money{
+		model.AccountWaterCold: {Charged: 1000, Paid: 400},
+	})
+	for _, row := range rows {
+		if row.Account == string(model.AccountWaterCold) {
+			if row.Debt != 600 {
+				t.Fatalf("долг: %v, ожидалось 600", row.Debt)
+			}
+			return
+		}
+	}
+	t.Fatal("строка холодной воды не найдена")
+}

@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/mail"
 	"strconv"
 	"strings"
@@ -110,6 +111,9 @@ func parseMoney(raw string) (float64, error) {
 	}
 	v, err := strconv.ParseFloat(strings.ReplaceAll(strings.ReplaceAll(raw, ",", "."), " ", ""), 64)
 	if err != nil {
+		return 0, fmt.Errorf("введите сумму")
+	}
+	if math.IsNaN(v) || math.IsInf(v, 0) {
 		return 0, fmt.Errorf("введите сумму")
 	}
 	if v < 0 {

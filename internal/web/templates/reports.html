@@ -129,6 +129,7 @@
   {{end}}
 </section>
 
+{{if .HasPreview}}
 <section class="panel report-preview">
   <div class="preview-head">
     <div>
@@ -170,13 +171,8 @@
   {{end}}
 
 
-  {{else}}
-  <div class="empty-inline">
-    <h3>За выбранный период показаний нет</h3>
-    <p class="hint">В выборе участвуют только заполненные месяцы.</p>
-    {{if .ObjectID}}<a class="btn" href="/?object={{.ObjectID}}">Внести показания</a>{{end}}
-  </div>
   {{end}}
 </section>
+{{end}}
 {{end}}
 {{end}}

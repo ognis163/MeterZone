@@ -172,11 +172,15 @@ func (s *Server) renderObjectError(w http.ResponseWriter, r *http.Request, obj m
 	base := s.base("Объект", "objects")
 	base.Error = msg
 	s.withObjectContext(w, r, &base, obj.ID, "/")
+	_, _, hasData := s.Store.PeriodRange(obj.ID)
 	s.render(w, http.StatusBadRequest, "object_form", objectFormData{
-		Base:   base,
-		Object: obj,
-		Meters: meters,
-		IsNew:  obj.ID == 0,
+		Base:          base,
+		Object:        obj,
+		Meters:        meters,
+		IsNew:         obj.ID == 0,
+		HasData:       hasData,
+		Resources:     model.ResourceOrder,
+		ParentOptions: activeParentOptions(meters, 0),
 	})
 }
 

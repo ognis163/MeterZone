@@ -1938,3 +1938,14 @@ input:disabled, select:disabled { opacity: .55; cursor: not-allowed; }
 /* PWA / iOS: не отдаём горизонтальный жест браузеру на полосах */
 html, body { overscroll-behavior-x: none; }
 .object-seg, .month-strip, .month-strip-months, .jrange, .jrange-seg, .jtable-wrap, .object-list { overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+@media (max-width: 759px) {
+  .jrange-custom { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); flex: 1 1 100%; }
+  .jrange-custom input[type="month"] { width: 100%; min-width: 0; }
+  .jrange-custom .btn { grid-column: 1 / -1; width: 100%; }
+  .jtable-wrap { -webkit-overflow-scrolling: touch; }
+  .jtable thead th.jth-month,
+  .jtable tbody .jtd-month,
+  .jtable tfoot .jtd-month { position: sticky; left: 0; z-index: 2; background: var(--surface); }
+  .jtable tbody tr.is-current .jtd-month { background: var(--accent-soft); }
+}.jscroll-hint { display: none; }
+@media (max-width: 759px) { .jscroll-hint { display: block; margin: 8px 0 0; } }

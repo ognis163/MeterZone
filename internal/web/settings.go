@@ -53,7 +53,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		DBPath:             s.Store.Path(),
 		Port:               s.Port,
 		Uptime:             humanUptime(time.Since(s.Started)),
-		Timezone:           s.Loc.String(),
+		Timezone:           timezoneLabel(s.Loc),
 		SMTP:               smtpToView(s.loadSMTP()),
 		BackupEmailEnabled: s.Store.Setting("backup_email_enabled", "") == "1",
 		BackupEmail:        s.Store.Setting("backup_email", ""),
@@ -242,7 +242,7 @@ func (s *Server) settingsError(w http.ResponseWriter, r *http.Request, msg strin
 		DBPath:             s.Store.Path(),
 		Port:               s.Port,
 		Uptime:             humanUptime(time.Since(s.Started)),
-		Timezone:           s.Loc.String(),
+		Timezone:           timezoneLabel(s.Loc),
 		SMTP:               smtpToView(s.loadSMTP()),
 		BackupEmailEnabled: s.Store.Setting("backup_email_enabled", "") == "1",
 		BackupEmail:        s.Store.Setting("backup_email", ""),
@@ -363,4 +363,11 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"uptime":  time.Since(s.Started).Round(time.Second).String(),
 		"db":      s.Store.Path(),
 	})
+}
+
+func timezoneLabel(loc *time.Location) string {
+	if loc == nil || loc.String() == "Local" {
+		return "системный"
+	}
+	return loc.String()
 }

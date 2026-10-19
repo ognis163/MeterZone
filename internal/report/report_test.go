@@ -198,3 +198,14 @@ func TestMonthNoBaseline(t *testing.T) {
 		t.Fatalf("текущее показание: %+v", row)
 	}
 }
+
+func TestNextReading(t *testing.T) {
+	series := map[string]float64{"2026-01": 100, "2026-04": 130}
+	v, p, ok := NextReading(series, model.Period{Year: 2026, Month: 2})
+	if !ok || v != 130 || p.Month != 4 {
+		t.Fatalf("NextReading = %v %v %v", v, p, ok)
+	}
+	if _, _, ok := NextReading(series, model.Period{Year: 2026, Month: 4}); ok {
+		t.Fatal("после последнего показания не должно быть следующего")
+	}
+}

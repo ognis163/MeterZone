@@ -75,6 +75,7 @@ type moneyRowView struct {
 	StatusText  string
 	ChargedRaw  float64
 	AdvanceRaw  float64
+	PaidRaw     float64
 	Debt        float64
 	Paid        bool
 	AdvancePaid bool
@@ -120,6 +121,7 @@ func moneyRowViewFor(acc model.Account, m model.Money, chargedText, advanceText 
 		StatusText:  moneyStatus(m),
 		ChargedRaw:  m.Charged,
 		AdvanceRaw:  m.Advance(),
+		PaidRaw:     m.Paid,
 		Debt:        m.Debt(),
 		Paid:        m.PaidFlag,
 		AdvancePaid: m.AdvancePaid,
@@ -132,7 +134,23 @@ func moneyRowsFrom(items map[model.Account]model.Money) []moneyRowView {
 	out := make([]moneyRowView, 0, 3)
 	for _, acc := range model.AccountOrder {
 		m := items[acc]
-		out = append(out, moneyRowViewFor(acc, m, "", ""))
+		row := moneyRowViewFor(acc, m, "", "")
+		// В журнале итоги считаем как остаток: начислено минус оплачено.
+		debt := model.Round2(m.Charged - m.Paid)
+		if debt < 0 {
+			debt = 0
+		}
+		row.Debt = debt
+		row.DebtText = model.FormatMoney(debt)
+		switch {
+		case m.Charged > 0 && m.Paid >= m.Charged:
+			row.StatusText = "Счёт оплачен"
+		case debt > 0:
+			row.StatusText = "Долг " + model.FormatMoney(debt)
+		default:
+			row.StatusText = "Не оплачено"
+		}
+		out = append(out, row)
 	}
 	return out
 }
@@ -589,6 +607,11 @@ func (s *Server) handleSaveReadings(w http.ResponseWriter, r *http.Request) {
 				m.Title(), model.FormatValue(val), model.FormatValue(prev)))
 			continue
 		}
+		if next, _, hasNext := report.NextReading(readings[m.ID], period); hasNext && val > next {
+			problems = append(problems, fmt.Sprintf("%s: показание %s больше следующего %s",
+				m.Title(), model.FormatValue(val), model.FormatValue(next)))
+			continue
+		}
 		inputs = append(inputs, store.ReadingInput{MeterID: m.ID, Value: val})
 	}
 
@@ -904,11 +927,13 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 			hasCons := false
 			for _, m := range group {
 				if v, ok := od.Readings[m.ID][p.String()]; ok {
-					hasReading = true
-					if !hasReading || v > reading {
-						reading = v
-					}
 					cell.Has = true
+					// Основной прибор показываем как есть; если основных
+					// несколько — суммируем. Дубли не суммируем.
+					if !m.IsSub() {
+						reading = model.Round3(reading + v)
+						hasReading = true
+					}
 				}
 				if m.IsSub() {
 					continue
@@ -964,7 +989,7 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 	moneyTotals, _ := s.Store.MoneyTotals(obj.ID, model.Period{Year: year, Month: 1}, model.Period{Year: year, Month: 12})
 	money = moneyRowsFrom(moneyTotals)
 	for _, m := range money {
-		if m.ChargedRaw != 0 || m.AdvanceRaw != 0 {
+		if m.ChargedRaw != 0 || m.AdvanceRaw != 0 || m.PaidRaw != 0 {
 			moneyAny = true
 		}
 	}

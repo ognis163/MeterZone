@@ -133,6 +133,23 @@ func PrevReading(series map[string]float64, p model.Period) (float64, model.Peri
 	return val, best, found
 }
 
+// NextReading ищет ближайшее показание после периода p.
+func NextReading(series map[string]float64, p model.Period) (float64, model.Period, bool) {
+	var best model.Period
+	var val float64
+	found := false
+	for key, v := range series {
+		pp, err := model.ParsePeriod(key)
+		if err != nil || !pp.After(p) {
+			continue
+		}
+		if !found || pp.Before(best) {
+			best, val, found = pp, v, true
+		}
+	}
+	return val, best, found
+}
+
 // LastReadingUpto ищет последнее показание не позже периода p.
 func LastReadingUpto(series map[string]float64, p model.Period) (float64, model.Period, bool) {
 	var best model.Period
