@@ -71,9 +71,28 @@ go build -trimpath -ldflags "-s -w" -o meterzone .
 При первом запуске база создаётся автоматически — она пустая, без примеров. Каталог с базой
 и резервными копиями создаётся рядом с программой.
 
-## Установка на роутер Keenetic
+## Установка на роутер Keenetic одной командой
 
-Пошагово — в [deploy/INSTALL_Keenetic.md](deploy/INSTALL_Keenetic.md).
+На Keenetic с Entware, по SSH под root:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ognis163/MeterZone/main/deploy/install.sh | sh
+```
+
+Скрипт скачает последний релиз для aarch64, установит его в `/opt/meterzone`,
+настроит автозапуск `/opt/etc/init.d/S99meterzone`, запустит сервис и покажет адрес.
+Существующая база `data/meterzone.db` не удаляется.
+
+Другой порт:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ognis163/MeterZone/main/deploy/install.sh | PORT=8090 sh
+```
+
+Нужен Keenetic Hopper (aarch64) с Entware и доступом в интернет.
+Если нет `curl`, используйте `wget -qO- <тот же адрес> | sh`.
+
+Пошагово, вручную — в [deploy/INSTALL_Keenetic.md](deploy/INSTALL_Keenetic.md).
 
 ## Структура репозитория
 

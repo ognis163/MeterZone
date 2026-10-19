@@ -3,6 +3,22 @@
 Приложение — один статический бинарник. На роутере не нужны Go, Node или база данных:
 SQLite и шрифт встроены.
 
+## Быстрая установка одной командой
+
+На Keenetic с Entware, по SSH под root:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ognis163/MeterZone/main/deploy/install.sh | sh
+```
+
+Скрипт скачает последний релиз для aarch64, установит в `/opt/meterzone`,
+настроит автозапуск `/opt/etc/init.d/S99meterzone` и запустит сервис.
+Существующая база не удаляется. Другой порт:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ognis163/MeterZone/main/deploy/install.sh | PORT=8090 sh
+```
+
 ## 1. Сборка на ПК
 
 ```powershell

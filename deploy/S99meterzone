@@ -17,7 +17,7 @@ case "$1" in
     echo "Starting MeterZone on port $PORT..."
     cd "$APP_DIR" || exit 1
     PORT=$PORT HOST=0.0.0.0 \
-      TZ=${APP_TZ:-UTC} ZONEINFO=/opt/share/zoneinfo APP_TZ=${APP_TZ:-UTC} \
+      ZONEINFO=/opt/share/zoneinfo \
       APP_DB=$APP_DIR/data/meterzone.db \
       APP_BACKUP_DIR=$APP_DIR/data/backups \
       "$APP_BIN" >> "$LOG" 2>&1 &
