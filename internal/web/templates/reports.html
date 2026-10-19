@@ -1,0 +1,182 @@
+{{define "page"}}
+{{if not .Objects}}
+<section class="empty-card">
+  <h2>Нет данных для отчёта</h2>
+  <p class="muted">Сначала добавьте объект и внесите показания.</p>
+  <a class="btn btn-primary" href="/objects/new">Добавить объект</a>
+</section>
+{{else}}
+<form method="get" action="/reports" class="panel report-controls" data-report-form>
+  <fieldset class="field report-object-field">
+    <legend>Объект</legend>
+    {{template "objectseg" .}}
+  </fieldset>
+  <div class="report-controls-grid">
+    <fieldset class="field">
+      <legend>Тип документа</legend>
+      <div class="segmented">
+        <label>
+          <input type="radio" name="kind" value="month" data-autosubmit {{if eq .Kind "month"}}checked{{end}}>
+          <span>За месяц</span>
+        </label>
+        <label>
+          <input type="radio" name="kind" value="range" data-autosubmit {{if eq .Kind "range"}}checked{{end}}>
+          <span>За период</span>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset class="field">
+      <legend>Что включить</legend>
+      <div class="segmented">
+        <label>
+          <input type="radio" name="scope" value="all" data-autosubmit {{if eq .Scope "all"}}checked{{end}}>
+          <span>Всё</span>
+        </label>
+        <label>
+          <input type="radio" name="scope" value="water" data-autosubmit {{if eq .Scope "water"}}checked{{end}}>
+          <span>Вода</span>
+        </label>
+        <label>
+          <input type="radio" name="scope" value="energy" data-autosubmit {{if eq .Scope "energy"}}checked{{end}}>
+          <span>Электро</span>
+        </label>
+      </div>
+    </fieldset>
+  </div>
+
+  {{if eq .Kind "month"}}
+    {{if .HasData}}
+      <div class="report-period-desktop">{{template "monthstrip" .Strip}}</div>
+      <input type="hidden" name="m" value="{{.Month}}">
+      <div class="field report-period-mobile">
+        <label for="m">Месяц с показаниями</label>
+        <select id="m" name="m_mobile" data-month-pick>
+          {{range .Months}}
+          <option value="{{.}}" {{if eq . $.Month}}selected{{end}}>{{period .}}</option>
+          {{end}}
+        </select>
+      </div>
+    {{else}}
+      <p class="hint">Показаний пока нет — выберите другой объект или внесите данные.</p>
+    {{end}}
+  {{else}}
+    <div class="report-range">
+      <div class="field">
+        <label for="from">С месяца</label>
+        <select id="from" name="from" data-autosubmit {{if not .HasData}}disabled{{end}}>
+          {{range .Months}}
+          <option value="{{.}}" {{if eq . $.From}}selected{{end}}>{{period .}}</option>
+          {{end}}
+        </select>
+      </div>
+      <div class="field">
+        <label for="to">По месяц</label>
+        <select id="to" name="to" data-autosubmit {{if not .HasData}}disabled{{end}}>
+          {{range .Months}}
+          <option value="{{.}}" {{if eq . $.To}}selected{{end}}>{{period .}}</option>
+          {{end}}
+        </select>
+      </div>
+    </div>
+  {{end}}
+
+  <noscript><button class="btn" type="submit">Обновить</button></noscript>
+</form>
+
+
+<section class="panel report-actions">
+  {{if .HasPreview}}
+  <form method="post" action="/reports/send" class="report-send">
+    <input type="hidden" name="object" value="{{.ObjectID}}">
+    <input type="hidden" name="kind" value="{{.Kind}}">
+    <input type="hidden" name="scope" value="{{.Scope}}">
+    {{if eq .Kind "month"}}
+    <input type="hidden" name="m" value="{{.Month}}">
+    {{else}}
+    <input type="hidden" name="from" value="{{.From}}">
+    <input type="hidden" name="to" value="{{.To}}">
+    {{end}}
+
+    <p class="eyebrow">Отправить на почту</p>
+    {{if or .EmailWater .EmailEnergy .SelfEmail}}
+    <div class="send-chips">
+      {{if .SelfEmail}}<button type="button" class="chip chip-btn" data-fill-email="{{.SelfEmail}}">Себе · {{.SelfEmail}}</button>{{end}}
+      {{if .EmailWater}}<button type="button" class="chip chip-btn" data-fill-email="{{.EmailWater}}">Водоканал · {{.EmailWater}}</button>{{end}}
+      {{if .EmailEnergy}}<button type="button" class="chip chip-btn" data-fill-email="{{.EmailEnergy}}">Энергосбыт · {{.EmailEnergy}}</button>{{end}}
+    </div>
+    {{end}}
+    <div class="send-row">
+      <input id="report_email" type="email" name="email" value="{{.EmailTo}}"
+             placeholder="Адрес получателя" autocomplete="off">
+      <button class="btn btn-primary" type="submit" {{if not .SMTPReady}}disabled{{end}}>Отправить</button>
+    </div>
+    {{if not .SMTPReady}}
+    <p class="hint">Почта не настроена. <a href="/settings">Настроить SMTP</a></p>
+    {{end}}
+  </form>
+  <div class="preview-actions">
+    <a class="btn btn-primary" href="{{.OpenHref}}">Открыть отчёт</a>
+    <a class="btn" href="{{.PDFHref}}">Скачать PDF</a>
+    <a class="btn" href="{{.PrintHref}}">Распечатать</a>
+  </div>
+  {{else}}
+  <div class="empty-inline">
+    <h3>За выбранный период показаний нет</h3>
+    <p class="hint">В выборе участвуют только заполненные месяцы.</p>
+    {{if .ObjectID}}<a class="btn" href="/?object={{.ObjectID}}">Внести показания</a>{{end}}
+  </div>
+  {{end}}
+</section>
+
+<section class="panel report-preview">
+  <div class="preview-head">
+    <div>
+      <p class="eyebrow">Предпросмотр</p>
+      <h2>{{.Object.Title}}</h2>
+      <p class="hint">{{if .PeriodText}}{{.PeriodText}}{{else}}Выберите период{{end}}</p>
+    </div>
+    {{if .HasPreview}}<span class="pill">готов к печати</span>{{end}}
+  </div>
+
+  {{if .HasPreview}}
+  <div class="preview-metrics{{if eq .Kind "month"}} cols3{{end}}">
+    <div class="preview-metric">
+      <span>Вода</span>
+      <b>{{fmtVal .WaterTotal}} <em>куб.м</em></b>
+    </div>
+    <div class="preview-metric">
+      <span>Электроэнергия</span>
+      <b>{{fmtVal .EnergyTotal}} <em>кВт·ч</em></b>
+    </div>
+    <div class="preview-metric">
+      <span>Приборов</span>
+      <b>{{.MeterCount}}</b>
+    </div>
+    {{if eq .Kind "range"}}
+    <div class="preview-metric">
+      <span>Месяцев</span>
+      <b>{{.MonthsCount}}</b>
+    </div>
+    {{end}}
+  </div>
+
+  {{if .PreviewRows}}
+  <ul class="preview-list">
+    {{range .PreviewRows}}
+    <li><span>{{.Label}}</span><b>{{.Value}} <em>{{.Unit}}</em>{{if .Note}}<small>{{.Note}}</small>{{end}}</b></li>
+    {{end}}
+  </ul>
+  {{end}}
+
+
+  {{else}}
+  <div class="empty-inline">
+    <h3>За выбранный период показаний нет</h3>
+    <p class="hint">В выборе участвуют только заполненные месяцы.</p>
+    {{if .ObjectID}}<a class="btn" href="/?object={{.ObjectID}}">Внести показания</a>{{end}}
+  </div>
+  {{end}}
+</section>
+{{end}}
+{{end}}

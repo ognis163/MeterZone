@@ -1,0 +1,67 @@
+{{define "page"}}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Справочник</p>
+    <h1>Объекты</h1>
+  </div>
+  <a class="btn btn-primary" href="/objects/new">{{template "icon-plus"}} Добавить</a>
+</section>
+
+{{if .Items}}
+<ul class="object-grid">
+  {{range .Items}}
+  <li class="object-card object-manage">
+    <a class="object-main" href="/?object={{.Object.ID}}">
+      <div class="object-top">
+        <div class="object-title">
+          <h2>{{.Object.Title}}</h2>
+          <p class="muted">{{kindLabel .Object.Kind}}{{if .Object.Address}} · {{.Object.Address}}{{end}}</p>
+        </div>
+        <span class="dot dot-{{statusClass .Status}}" aria-hidden="true"></span>
+      </div>
+      <div class="object-bottom">
+        <span class="status">{{statusText .Status}}</span>
+        <span class="object-meta">
+          {{if .Meters}}{{.Meters}} {{plural .Meters "прибор" "прибора" "приборов"}}{{else}}нет приборов{{end}}
+          {{if .Last}}<span class="sep">·</span> {{.Last}}{{end}}
+        </span>
+      </div>
+    </a>
+    <div class="object-actions">
+      <a class="btn btn-ghost btn-sm" href="/?object={{.Object.ID}}">Внести</a>
+      <a class="iconbtn" href="/objects/{{.Object.ID}}/edit" aria-label="Изменить {{.Object.Title}}">{{template "icon-pencil"}}</a>
+    </div>
+  </li>
+  {{end}}
+</ul>
+{{else}}
+<section class="empty-card">
+  <div class="empty-icon">{{template "icon-home"}}</div>
+  <h2>Объектов пока нет</h2>
+  <p class="muted">Добавьте дом или коммерческое помещение — и вносите показания.</p>
+  <a class="btn btn-primary" href="/objects/new">Добавить объект</a>
+</section>
+{{end}}
+
+{{if .Archived}}
+<h2 class="h2">Архив</h2>
+<ul class="object-grid">
+  {{range .Archived}}
+  <li class="object-card object-manage is-archived">
+    <div class="object-main">
+      <div class="object-top">
+        <div class="object-title">
+          <h2>{{.Object.Title}}</h2>
+          <p class="muted">{{kindLabel .Object.Kind}}{{if .Object.Address}} · {{.Object.Address}}{{end}}</p>
+        </div>
+        <span class="badge">архив</span>
+      </div>
+    </div>
+    <div class="object-actions">
+      <a class="iconbtn" href="/objects/{{.Object.ID}}/edit" aria-label="Изменить">{{template "icon-pencil"}}</a>
+    </div>
+  </li>
+  {{end}}
+</ul>
+{{end}}
+{{end}}

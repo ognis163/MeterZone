@@ -1,0 +1,63 @@
+{{define "meter_fields"}}
+<input type="hidden" name="object_id" value="{{.Object.ID}}">
+
+<div class="form-grid">
+  <div class="field">
+    <label>Ресурс</label>
+    <select name="resource" required>
+      {{range .Resources}}
+      <option value="{{.}}" {{if eq . $.Meter.Resource}}selected{{end}}>{{.Label}}</option>
+      {{end}}
+    </select>
+  </div>
+  <div class="field">
+    <label>Место установки</label>
+    <input type="text" name="label" value="{{.Meter.Label}}" maxlength="80"
+           placeholder="Кухня, подвал, щиток" autocomplete="off">
+  </div>
+  <div class="field">
+    <label>Марка</label>
+    <input type="text" name="brand" value="{{.Meter.Brand}}" maxlength="80" autocomplete="off"
+           placeholder="Например, СВК-15">
+  </div>
+  <div class="field">
+    <label>Заводской номер</label>
+    <input type="text" name="serial" value="{{.Meter.Serial}}" maxlength="60" autocomplete="off">
+  </div>
+  <div class="field">
+    <label>Начальное показание</label>
+    <input type="text" name="start_value" value="{{fmtInput .Meter.StartValue}}"
+           inputmode="decimal" autocomplete="off" placeholder="0">
+  </div>
+  <div class="field">
+    <label>Дата установки</label>
+    <input type="text" name="installed_on" value="{{.Meter.InstalledOn}}"
+           placeholder="ГГГГ-ММ-ДД" inputmode="numeric" autocomplete="off">
+  </div>
+  <div class="field span-2">
+    <label>Дублирующий счётчик</label>
+    <select name="parent_id">
+      <option value="0">Нет — самостоятельный прибор</option>
+      {{range .ParentOptions}}
+      <option value="{{.ID}}" {{if eq .ID $.Meter.ParentID}}selected{{end}}>
+        {{.Title}}{{if .Detail}} · {{.Detail}}{{end}} — {{.Resource.Label}}
+      </option>
+      {{end}}
+    </select>
+    <p class="hint">Если счётчик дублирует основной, выберите его: посчитаем смещение и покажем показания для отправки.</p>
+  </div>
+  <div class="field">
+    <label>Финансовый учёт</label>
+    <select name="finance_mode">
+      <option value="none" {{if eq .Meter.FinanceModeValue "none"}}selected{{end}}>Не вести</option>
+      <option value="advance" {{if eq .Meter.FinanceModeValue "advance"}}selected{{end}}>Только аванс</option>
+      <option value="bill" {{if eq .Meter.FinanceModeValue "bill"}}selected{{end}}>Только счёт</option>
+      <option value="both" {{if eq .Meter.FinanceModeValue "both"}}selected{{end}}>Аванс и счёт</option>
+    </select>
+  </div>
+  <div class="field field-short">
+    <label>Порядок</label>
+    <input type="number" name="sort" value="{{.Meter.Sort}}" min="0" max="999" inputmode="numeric">
+  </div>
+</div>
+{{end}}

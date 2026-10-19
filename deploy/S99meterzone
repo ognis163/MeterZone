@@ -1,0 +1,44 @@
+#!/bin/sh
+# MeterZone — учёт показаний приборов учёта (Keenetic / Entware)
+# Запуск: /opt/etc/init.d/S99meterzone {start|stop|restart|status}
+
+APP_DIR=/opt/meterzone
+APP_BIN=$APP_DIR/meterzone
+LOG=/opt/var/log/meterzone.log
+PORT=8099
+
+case "$1" in
+  start)
+    if pidof meterzone >/dev/null 2>&1; then
+      echo "meterzone already running"
+      exit 0
+    fi
+    mkdir -p "$APP_DIR/data"
+    echo "Starting MeterZone on port $PORT..."
+    cd "$APP_DIR" || exit 1
+    PORT=$PORT HOST=0.0.0.0 \
+      TZ=${APP_TZ:-UTC} ZONEINFO=/opt/share/zoneinfo APP_TZ=${APP_TZ:-UTC} \
+      APP_DB=$APP_DIR/data/meterzone.db \
+      APP_BACKUP_DIR=$APP_DIR/data/backups \
+      "$APP_BIN" >> "$LOG" 2>&1 &
+    sleep 2
+    if pidof meterzone >/dev/null 2>&1; then echo "ok"; else echo "failed, see $LOG"; fi
+    ;;
+  stop)
+    echo "Stopping MeterZone..."
+    kill $(pidof meterzone) 2>/dev/null
+    ;;
+  restart)
+    "$0" stop
+    sleep 1
+    "$0" start
+    ;;
+  status)
+    if pidof meterzone >/dev/null 2>&1; then echo "running"; else echo "stopped"; fi
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart|status}"
+    exit 1
+    ;;
+esac
+exit 0

@@ -1,0 +1,79 @@
+{{define "page"}}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Учёт показаний</p>
+    <h1>Показания</h1>
+  </div>
+  <a class="btn btn-ghost hide-sm" href="/objects/new">{{template "icon-plus"}} Объект</a>
+</section>
+
+<div class="home-layout">
+  <div class="home-main">
+    {{template "monthnav" .MonthNav}}
+
+    {{if .Empty}}
+    <section class="empty-card">
+      <div class="empty-icon">{{template "icon-meter"}}</div>
+      <h2>Начните с объекта</h2>
+      <p class="muted">Добавьте дом или коммерческое помещение, затем — счётчики воды и электроэнергии.</p>
+      <div class="empty-actions">
+        <a class="btn btn-primary" href="/objects/new">{{template "icon-plus"}} Добавить объект</a>
+        <a class="btn btn-ghost" href="/settings#import">Импорт старой базы</a>
+      </div>
+    </section>
+    {{else}}
+    <ul class="cards">
+      {{range .Cards}}
+      <li>
+        <a class="object-card" href="{{.EntryHref}}">
+          <div class="object-top">
+            <div class="object-title">
+              <h2>{{.Object.Title}}</h2>
+              <p class="muted">{{if .Object.Address}}{{.Object.Address}}{{else}}{{kindLabel .Object.Kind}}{{end}}</p>
+            </div>
+            <span class="dot dot-{{statusClass .Status}}" aria-hidden="true"></span>
+          </div>
+          <div class="object-bottom">
+            <div class="object-status">
+              <span class="status">{{statusText .Status}}</span>
+              {{if .HasDebt}}<span class="debt {{if gt .Debt 0.0}}debt-due{{else}}debt-advance{{end}}">{{.DebtText}}</span>{{end}}
+            </div>
+            <span class="object-meta">
+              {{if .Meters}}{{.Meters}} {{plural .Meters "прибор" "прибора" "приборов"}}{{else}}нет приборов{{end}}
+              {{if .Last}}<span class="sep">·</span> {{.Last}}{{end}}
+            </span>
+          </div>
+        </a>
+      </li>
+      {{end}}
+    </ul>
+    <a class="add-row" href="/objects/new">{{template "icon-plus"}} Добавить объект</a>
+    {{end}}
+  </div>
+
+  {{if not .Empty}}
+  <aside class="home-side">
+    <section class="panel side-summary">
+      <p class="eyebrow">Сводка за месяц</p>
+      <h2>{{.Month.Label}}</h2>
+      <div class="summary-pairs">
+        <div>
+          <span class="summary-value">{{.Summary.Filled}}/{{.Summary.Objects}}</span>
+          <span class="summary-label">объектов заполнено</span>
+        </div>
+        <div>
+          <span class="summary-value">{{.Summary.MeterDone}}/{{.Summary.Meters}}</span>
+          <span class="summary-label">приборов внесено</span>
+        </div>
+      </div>
+      <dl class="summary-list">
+        <div><dt>Вода</dt><dd>{{fmtVal .Summary.Water}} <span class="unit">куб.м</span></dd></div>
+        <div><dt>Электро</dt><dd>{{fmtVal .Summary.Energy}} <span class="unit">кВт·ч</span></dd></div>
+        <div><dt>Долг</dt><dd class="{{if gt .Summary.Debt 0.0}}neg{{else if lt .Summary.Debt 0.0}}adv{{end}}">{{money .Summary.Debt}}</dd></div>
+      </dl>
+      <a class="btn btn-ghost btn-block" href="/reports">Отчёт за месяц</a>
+    </section>
+  </aside>
+  {{end}}
+</div>
+{{end}}

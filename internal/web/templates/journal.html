@@ -1,0 +1,125 @@
+{{define "page"}}
+{{if not .Objects}}
+<section class="empty-card">
+  <h2>Пока нет объектов</h2>
+  <p class="muted">Добавьте объект и приборы, чтобы увидеть журнал показаний.</p>
+  <a class="btn btn-primary" href="/objects/new">Добавить объект</a>
+</section>
+{{else}}
+<section class="top-panel journal-top">
+  {{template "objectseg" .}}
+
+  <div class="jrange">
+    <span class="jrange-cap">Период</span>
+    <div class="segmented jrange-seg">
+      {{range .Ranges}}
+      <a class="seg-link{{if .Active}} is-active{{end}}" href="{{.Href}}"{{if .Active}} aria-current="true"{{end}}>{{.Label}}</a>
+      {{end}}
+    </div>
+    <form method="get" action="/journal" class="jrange-custom">
+      <input type="hidden" name="object" value="{{.Object.ID}}">
+      <input type="month" name="from" value="{{.FromValue}}" min="2000-01" max="2100-12" aria-label="С месяца">
+      <span class="jrange-dash">—</span>
+      <input type="month" name="to" value="{{.ToValue}}" min="2000-01" max="2100-12" aria-label="По месяц">
+      <button class="btn btn-ghost btn-sm" type="submit">Показать</button>
+    </form>
+  </div>
+</section>
+
+{{if not .HasData}}
+<section class="empty-card">
+  <h2>Нет приборов</h2>
+  <p class="muted">У объекта не настроены счётчики.</p>
+  <a class="btn btn-primary" href="/objects/{{.Object.ID}}/edit">Добавить прибор</a>
+</section>
+{{else}}
+{{if not .HasMonths}}
+<section class="empty-card">
+  <h2>За выбранный период показаний нет</h2>
+  <p class="muted">Попробуйте другой диапазон: {{.FromLabel}} — {{.ToLabel}}.</p>
+</section>
+{{end}}
+
+<section class="panel j-summary">
+  <div class="section-head">
+    <h2>Итоги за {{.RangeLabel}}</h2>
+    <span class="jcount">месяцев с данными: {{.MonthsCount}}</span>
+  </div>
+  <div class="jtotals">
+    {{range .BookTotals}}
+    <div class="jtotal-card">
+      <span class="jtotal-name">{{.Label}}</span>
+      <span class="jtotal-value">{{.Consumption}} <small>{{.Unit}}</small></span>
+    </div>
+    {{end}}
+  </div>
+  <div class="jtable-wrap">
+    <table class="jtable">
+      <thead>
+        <tr>
+          <th class="jth-month">Месяц</th>
+          {{range .Resources}}
+          <th colspan="2">{{.Short}}</th>
+          {{end}}
+        </tr>
+        <tr class="jsub">
+          <th></th>
+          {{range .Resources}}
+          <th class="js">показание</th>
+          <th class="js">расход</th>
+          {{end}}
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Rows}}
+        <tr class="jtr{{if .IsCurrent}} is-current{{end}}{{if not .HasAny}} is-empty-row{{end}}" data-period="{{.Period}}">
+          <td class="jtd-month">
+            <a href="{{.Href}}" class="jmonth-link">{{.Label}}</a>
+            {{if .IsCurrent}}<span class="jnow">сейчас</span>{{end}}
+          </td>
+          {{range .Cells}}
+          <td class="jtd-read">{{if .Reading}}{{.Reading}}{{else}}—{{end}}</td>
+          <td class="jtd-cons">{{if .Consumption}}{{.Consumption}}{{else}}—{{end}}</td>
+          {{end}}
+        </tr>
+        {{end}}
+      </tbody>
+      <tfoot>
+        <tr>
+          <th class="jtd-month">Итого</th>
+          {{range .BookTotals}}
+          <th class="jtd-read">—</th>
+          <th class="jtd-cons">{{.Consumption}} {{.Unit}}</th>
+          {{end}}
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <p class="hint">Показание — счётчик на конец месяца, расход — сколько израсходовано за месяц. Нажмите на месяц, чтобы внести или исправить данные.</p>
+</section>
+
+{{if .MoneyAny}}
+<section class="panel money-summary">
+  <div class="section-head">
+    <h2>Начисления за {{.RangeLabel}}</h2>
+  </div>
+  <table class="simple-table">
+    <thead>
+      <tr><th>Счёт</th><th class="num">Сумма</th><th class="num">Оплачено</th><th class="num">Долг</th></tr>
+    </thead>
+    <tbody>
+      {{range .Money}}
+      <tr>
+        <td>{{.Label}}</td>
+        <td class="num">{{.ChargedText}}</td>
+        <td class="num">{{.PaidText}}</td>
+        <td class="num {{if gt .Debt 0.0}}neg{{else if lt .Debt 0.0}}adv{{end}}">{{.DebtText}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</section>
+{{end}}
+{{end}}
+{{end}}
+{{end}}

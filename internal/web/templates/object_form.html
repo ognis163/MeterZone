@@ -1,0 +1,195 @@
+{{define "page"}}
+{{if .IsNew}}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Объекты</p>
+    <h1>Новый объект</h1>
+    <p class="muted">Название и адрес — этого достаточно, остальное можно заполнить позже.</p>
+  </div>
+</section>
+{{else}}
+<nav class="crumbs" aria-label="Путь">
+  <a href="/objects">Объекты</a>
+  <span aria-hidden="true">/</span>
+  <span>{{.Object.Title}}</span>
+</nav>
+<section class="page-head">
+  <div>
+    <h1>{{.Object.Title}}</h1>
+    <p class="muted">{{kindLabel .Object.Kind}}{{if .Object.Address}} · {{.Object.Address}}{{end}}</p>
+  </div>
+  <div class="page-actions object-actions">
+    {{if .Object.Archived}}
+    <form method="post" action="/objects/save">
+      <input type="hidden" name="id" value="{{.Object.ID}}">
+      <input type="hidden" name="name" value="{{.Object.Name}}">
+      <input type="hidden" name="kind" value="{{.Object.Kind}}">
+      <input type="hidden" name="address" value="{{.Object.Address}}">
+      <input type="hidden" name="owner" value="{{.Object.Owner}}">
+      <input type="hidden" name="account_water" value="{{.Object.AccountWater}}">
+      <input type="hidden" name="account_energy" value="{{.Object.AccountEnergy}}">
+      <input type="hidden" name="email_water" value="{{.Object.EmailWater}}">
+      <input type="hidden" name="email_energy" value="{{.Object.EmailEnergy}}">
+      <input type="hidden" name="note" value="{{.Object.Note}}">
+      <input type="hidden" name="archived_present" value="1">
+      <button class="btn btn-ghost" type="submit">Вернуть из архива</button>
+    </form>
+    {{else}}
+    <form method="post" action="/objects/{{.Object.ID}}/archive"
+          data-confirm="Убрать объект в архив? История сохранится.">
+      <button class="btn btn-ghost" type="submit">В архив</button>
+    </form>
+    {{end}}
+    <form method="post" action="/objects/{{.Object.ID}}/delete"
+          data-confirm="Удалить объект со всеми приборами и показаниями? Это нельзя отменить.">
+      <button class="btn btn-danger" type="submit">Удалить объект</button>
+    </form>
+  </div>
+</section>
+{{end}}
+
+<div class="object-page">
+  <div class="object-main">
+    <form method="post" action="/objects/save" id="object-form" class="object-form" data-object-form>
+      {{if not .IsNew}}<input type="hidden" name="id" value="{{.Object.ID}}">{{end}}
+
+      <section class="panel form-section">
+        <div class="section-head">
+          <h2>Основное</h2>
+        </div>
+        <div class="form-grid">
+          <div class="field span-2">
+            <label for="name">Название</label>
+            <input id="name" type="text" name="name" value="{{.Object.Name}}" maxlength="120"
+                   placeholder="Например, Дом или магазин" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="kind">Тип</label>
+            <select id="kind" name="kind">
+              <option value="house" {{if eq .Object.Kind "house"}}selected{{end}}>Дом</option>
+              <option value="commercial" {{if eq .Object.Kind "commercial"}}selected{{end}}>Коммерческий</option>
+              <option value="other" {{if eq .Object.Kind "other"}}selected{{end}}>Другой</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="owner">Собственник</label>
+            <input id="owner" type="text" name="owner" value="{{.Object.Owner}}" maxlength="160" autocomplete="off"
+                   placeholder="ФИО или организация">
+          </div>
+          <div class="field span-2">
+            <label for="address">Адрес</label>
+            <input id="address" type="text" name="address" value="{{.Object.Address}}" maxlength="300" autocomplete="off"
+                   placeholder="Город, улица, дом, помещение">
+          </div>
+        </div>
+      </section>
+
+      <section class="panel form-section">
+        <div class="section-head">
+          <h2>Для документов</h2>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="account_water">Лицевой счёт · вода</label>
+            <input id="account_water" type="text" name="account_water" value="{{.Object.AccountWater}}" maxlength="40"
+                   inputmode="numeric" autocomplete="off" placeholder="Необязательно">
+          </div>
+          <div class="field">
+            <label for="account_energy">Лицевой счёт · электро</label>
+            <input id="account_energy" type="text" name="account_energy" value="{{.Object.AccountEnergy}}" maxlength="40"
+                   inputmode="numeric" autocomplete="off" placeholder="Необязательно">
+          </div>
+          <div class="field">
+            <label for="email_water">Почта водоканала</label>
+            <input id="email_water" type="email" name="email_water" value="{{.Object.EmailWater}}"
+                   maxlength="160" autocomplete="off" placeholder="vodokanal@example.ru">
+          </div>
+          <div class="field">
+            <label for="email_energy">Почта энергосбыта</label>
+            <input id="email_energy" type="email" name="email_energy" value="{{.Object.EmailEnergy}}"
+                   maxlength="160" autocomplete="off" placeholder="energo@example.ru">
+          </div>
+          <div class="field span-2">
+            <label for="note">Заметка</label>
+            <textarea id="note" name="note" rows="2" maxlength="500" placeholder="Необязательно">{{.Object.Note}}</textarea>
+          </div>
+        </div>
+      </section>
+
+      {{if not .IsNew}}
+      <section class="panel form-section">
+        <label class="check">
+          <input type="checkbox" name="archived" value="1" {{if .Object.Archived}}checked{{end}}>
+          <input type="hidden" name="archived_present" value="1">
+          <span>В архиве — скрыть из списка, история сохранится</span>
+        </label>
+      </section>
+      {{end}}
+
+      <div class="form-actions object-form-actions">
+        <button class="btn btn-primary" type="submit">{{if .IsNew}}Создать объект{{else}}Сохранить изменения{{end}}</button>
+        <a class="btn btn-ghost" href="/objects">Отмена</a>
+      </div>
+    </form>
+  </div>
+
+  <aside class="object-side">
+    <section class="panel meters-panel">
+      <div class="section-head">
+        <h2>Приборы учёта</h2>
+      </div>
+
+      {{if .IsNew}}
+      <p class="muted">Сначала сохраните объект — после этого здесь можно будет добавить приборы учёта.</p>
+      {{else}}
+        {{if .Meters}}
+        <ul class="meters">
+          {{range .Meters}}
+          <li class="meter-row {{if .Archived}}is-archived{{end}}"
+              data-resource="{{.Resource}}" data-label="{{.Label}}" data-brand="{{.Brand}}" data-serial="{{.Serial}}"
+              data-start="{{fmtInput .StartValue}}" data-installed="{{.InstalledOn}}" data-parent="{{.ParentID}}"
+              data-finance="{{.FinanceModeValue}}" data-sort="{{.Sort}}">
+            <span class="meter-ico">
+              {{if .Resource.IsWater}}{{template "icon-drop"}}{{else}}{{template "icon-bolt"}}{{end}}
+            </span>
+            <span class="meter-row-main">
+              <span class="meter-row-title">
+                {{.Title}}
+                {{if .IsSub}}<span class="badge badge-sub">дубль</span>{{end}}
+                {{if .Archived}}<span class="badge">архив</span>{{end}}
+              </span>
+              <span class="meter-row-sub">
+                {{.Resource.Label}}{{if .Detail}} · {{.Detail}}{{end}}{{if .StartValue}} · старт {{fmtVal .StartValue}}{{end}}
+              </span>
+            </span>
+            <button class="iconbtn" type="button" data-meter-edit="{{.ID}}" aria-label="Изменить прибор">{{template "icon-pencil"}}</button>
+          </li>
+          {{end}}
+        </ul>
+        {{else}}
+        <p class="muted">Пока нет приборов. Добавьте счётчики холодной и горячей воды, электроэнергии.</p>
+        {{end}}
+
+        <div class="meter-inline" data-meter-inline>
+          <div class="meter-inline-head">
+            <h3 data-meter-inline-title>Новый прибор</h3>
+            <button class="iconbtn meter-inline-close" type="button" data-meter-cancel aria-label="Закрыть форму прибора">✕</button>
+          </div>
+          <form method="post" action="/meters/save" class="meter-inline-form">
+            <input type="hidden" name="id" value="0" data-meter-id>
+            {{template "meter_fields" .}}
+            <input type="hidden" name="back" value="object">
+            <div class="meter-inline-actions">
+              <button class="btn btn-primary" type="submit" data-meter-save>Добавить прибор</button>
+              <button class="btn btn-ghost" type="button" data-meter-cancel>Отмена</button>
+            </div>
+          </form>
+        </div>
+
+        <button class="btn btn-primary object-add-meter" type="button" data-meter-open id="meter-open">{{template "icon-plus"}} Добавить прибор</button>
+      {{end}}
+    </section>
+  </aside>
+</div>
+
+{{end}}

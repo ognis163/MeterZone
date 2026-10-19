@@ -1,0 +1,199 @@
+{{define "page"}}
+{{if .IsFuture}}<p class="note">Выбран будущий месяц: показания можно внести заранее.</p>{{end}}
+
+<form method="post" action="/o/{{.Object.ID}}/readings?m={{.Period}}" class="entry-layout grid-layout" data-entry
+      data-object="{{.Object.ID}}" data-period="{{.Period}}">
+
+  <section class="top-panel">
+    {{template "objectseg" .}}
+    {{template "monthnav" .MonthNav}}
+  </section>
+
+  <div class="entry-main">
+    {{if not .HasMeters}}
+    <section class="empty-card">
+      <div class="empty-icon">{{template "icon-meter"}}</div>
+      <h2>Нет приборов учёта</h2>
+      <p class="muted">Добавьте счётчики холодной и горячей воды, электроэнергии.</p>
+      <a class="btn btn-primary" href="/meters/new?object={{.Object.ID}}">Добавить прибор</a>
+    </section>
+    {{end}}
+    {{range .Sections}}
+    <section class="panel section">
+      <header class="section-head">
+        <h2>
+          {{if .Resource.IsWater}}{{template "icon-drop"}}{{else}}{{template "icon-bolt"}}{{end}}
+          {{.Title}}
+        </h2>
+        <span class="unit-label">{{.Unit}}</span>
+      </header>
+      {{$unit := .Unit}}
+      {{range .Meters}}
+      <div class="meter {{if .IsSub}}is-sub{{end}} {{if .Invalid}}is-invalid{{end}}">
+        <div class="meter-name">
+          <span>
+            {{.Meter.Title}}
+            {{if .IsSub}}<span class="badge badge-sub">дубль</span>{{end}}
+          </span>
+          {{if .Meter.Detail}}<small>{{.Meter.Detail}}</small>{{end}}
+          {{if .HasChildren}}<small class="net-note">есть дублирующий счётчик</small>{{end}}
+        </div>
+        <div class="meter-prev">
+          <span class="lbl">пред.</span>
+          <span class="val">{{.PrevText}}</span>
+        </div>
+        <label class="meter-input">
+          <span class="sr-only">Текущее показание, {{.Meter.Title}}</span>
+          <input type="text" inputmode="decimal" enterkeyhint="next" autocomplete="off"
+                 name="v_{{.Meter.ID}}" value="{{.CurrText}}" placeholder="—"
+                 data-prev="{{.PrevRaw}}" data-meter="{{.Meter.ID}}"
+                 {{if .IsSub}}data-parent-meter="{{.Meter.ParentID}}"{{end}}>
+          <span class="unit">{{$unit}}</span>
+        </label>
+        <div class="meter-diff">
+          <span class="lbl">расход</span>
+          <span class="val" data-diff="{{.Meter.ID}}">{{if .HasDiff}}{{fmtVal .Diff}}{{else}}—{{end}}</span>
+        </div>
+        {{if .HasDerived}}<p class="dup-note">Дубль · смещение {{.OffsetText}} · к отправке {{.DerivedText}} {{$unit}}</p>{{end}}
+        {{if .Invalid}}<p class="meter-error">Меньше предыдущего или отрицательный расход — проверьте число.</p>{{end}}
+      </div>
+      {{end}}
+    </section>
+    {{end}}
+  </div>
+
+  <aside class="entry-side">
+    {{if .FinanceAny}}
+    <section class="panel finance-panel">
+      <div class="section-head">
+        <h2>Финансовый учёт</h2>
+      </div>
+
+      {{if or .FinanceWaterCold .FinanceWaterHot}}
+      <div class="money-group">
+        <div class="money-group-title">Водоснабжение</div>
+        <div class="money-water-grid {{if and .FinanceWaterCold .FinanceWaterHot}}has-two{{else}}has-one{{end}}">
+          {{range .Money}}
+          {{if or .IsCold .IsHot}}
+          <div class="money-account" data-money-row data-account="{{.Account}}">
+            <div class="money-label">{{.Label}}</div>
+
+            {{if .ShowAdvance}}
+            <label class="money-field">
+              <span>Аванс</span>
+              <span class="money-input">
+                <input type="text" inputmode="decimal" autocomplete="off"
+                       name="advance_{{.Account}}" value="{{.AdvanceText}}" data-advance="{{.Account}}">
+                <button type="button" class="money-check{{if .AdvancePaid}} is-paid{{end}}"
+                        data-paid-toggle="advance_paid_{{.Account}}"
+                        data-flag-target="advance_paid_{{.Account}}"
+                        aria-label="Аванс оплачен" aria-pressed="{{if .AdvancePaid}}true{{else}}false{{end}}">✓</button>
+              </span>
+              <input type="hidden" name="advance_paid_{{.Account}}" value="{{if .AdvancePaid}}1{{end}}" data-paid-input="advance_paid_{{.Account}}">
+            </label>
+            {{else}}
+            <input type="hidden" name="advance_{{.Account}}" value="{{.AdvanceText}}">
+            <input type="hidden" name="advance_paid_{{.Account}}" value="{{if .AdvancePaid}}1{{end}}">
+            {{end}}
+
+            {{if .ShowBill}}
+            <label class="money-field">
+              <span>Счёт</span>
+              <span class="money-input">
+                <input type="text" inputmode="decimal" autocomplete="off"
+                       name="charged_{{.Account}}" value="{{.ChargedText}}" data-charged="{{.Account}}">
+                <button type="button" class="money-check{{if .Paid}} is-paid{{end}}"
+                        data-paid-toggle="paid_{{.Account}}"
+                        data-flag-target="paid_{{.Account}}"
+                        aria-label="Счёт оплачен" aria-pressed="{{if .Paid}}true{{else}}false{{end}}">✓</button>
+              </span>
+              <input type="hidden" name="paid_{{.Account}}" value="{{if .Paid}}1{{end}}" data-paid-input="paid_{{.Account}}">
+            </label>
+            {{else}}
+            <input type="hidden" name="charged_{{.Account}}" value="{{.ChargedText}}">
+            <input type="hidden" name="paid_{{.Account}}" value="{{if .Paid}}1{{end}}">
+            {{end}}
+          </div>
+          {{end}}
+          {{end}}
+        </div>
+      </div>
+      {{end}}
+
+      {{if .FinanceEnergy}}
+      <div class="money-group">
+        <div class="money-group-title">Электроэнергия</div>
+        {{range .Money}}
+        {{if .IsEnergy}}
+        <div class="money-account" data-money-row data-account="{{.Account}}">
+          {{if .ShowAdvance}}
+          <label class="money-field">
+            <span>Аванс</span>
+            <span class="money-input">
+              <input type="text" inputmode="decimal" autocomplete="off"
+                     name="advance_{{.Account}}" value="{{.AdvanceText}}" data-advance="{{.Account}}">
+              <button type="button" class="money-check{{if .AdvancePaid}} is-paid{{end}}"
+                      data-paid-toggle="advance_paid_{{.Account}}"
+                      data-flag-target="advance_paid_{{.Account}}"
+                      aria-label="Аванс оплачен" aria-pressed="{{if .AdvancePaid}}true{{else}}false{{end}}">✓</button>
+            </span>
+            <input type="hidden" name="advance_paid_{{.Account}}" value="{{if .AdvancePaid}}1{{end}}" data-paid-input="advance_paid_{{.Account}}">
+          </label>
+          {{else}}
+          <input type="hidden" name="advance_{{.Account}}" value="{{.AdvanceText}}">
+          <input type="hidden" name="advance_paid_{{.Account}}" value="{{if .AdvancePaid}}1{{end}}">
+          {{end}}
+
+          {{if .ShowBill}}
+          <label class="money-field">
+            <span>Счёт</span>
+            <span class="money-input">
+              <input type="text" inputmode="decimal" autocomplete="off"
+                     name="charged_{{.Account}}" value="{{.ChargedText}}" data-charged="{{.Account}}">
+              <button type="button" class="money-check{{if .Paid}} is-paid{{end}}"
+                      data-paid-toggle="paid_{{.Account}}"
+                      data-flag-target="paid_{{.Account}}"
+                      aria-label="Счёт оплачен" aria-pressed="{{if .Paid}}true{{else}}false{{end}}">✓</button>
+            </span>
+            <input type="hidden" name="paid_{{.Account}}" value="{{if .Paid}}1{{end}}" data-paid-input="paid_{{.Account}}">
+          </label>
+          {{else}}
+          <input type="hidden" name="charged_{{.Account}}" value="{{.ChargedText}}">
+          <input type="hidden" name="paid_{{.Account}}" value="{{if .Paid}}1{{end}}">
+          {{end}}
+        </div>
+        {{end}}
+        {{end}}
+      </div>
+      {{end}}
+
+      <div class="finance-save">
+        <span class="savebar-status" data-finance-status data-state="ok">Изменения сохраняются автоматически</span>
+      </div>
+    </section>
+    {{end}}
+
+    {{if .HasMeters}}
+    <section class="panel totals-panel">
+      <h2>Итоги месяца</h2>
+      <dl class="summary-list">
+        <div><dt>Вода</dt><dd><span data-water-total>{{fmtVal .WaterTotal}}</span> <span class="unit">куб.м</span></dd></div>
+        <div><dt>Электроэнергия</dt><dd><span data-energy-total>{{fmtVal .EnergyTotal}}</span> <span class="unit">кВт·ч</span></dd></div>
+      </dl>
+      <div class="savebar" data-autosave-status>
+        <span class="savebar-status" data-state="ok">Показания сохраняются автоматически</span>
+      </div>
+    </section>
+    {{end}}
+  </aside>
+</form>
+
+<details class="danger">
+  <summary>Удалить показания за {{.Period.Label}}</summary>
+  <form method="post" action="/o/{{.Object.ID}}/clear?m={{.Period}}"
+        data-confirm="Удалить все показания за {{.Period.Label}}? Действие нельзя отменить.">
+    <p class="muted">Будут удалены все показания этого объекта за выбранный месяц. Начисления останутся.</p>
+    <button class="btn btn-danger" type="submit">Удалить за месяц</button>
+  </form>
+</details>
+{{end}}

@@ -1,0 +1,25 @@
+# Build artifacts
+*.exe
+*.test
+*.out
+meterzone
+indextro2
+
+# Local data
+data/
+run/
+*.db
+*.db-wal
+*.db-shm
+deploy/dist/
+
+# Editors and OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Secrets
+*.env
+.env
+smtp.local.*

@@ -1,0 +1,212 @@
+{{define "page"}}
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Сервис</p>
+    <h1>Настройки</h1>
+  </div>
+</section>
+
+{{if .Imported}}
+<div class="flash" role="status">
+  Импорт завершён: объектов {{.Imported.Objects}}, приборов {{.Imported.Meters}}, показаний {{.Imported.Readings}}.
+</div>
+{{end}}
+
+<div class="settings-grid">
+  <div class="settings-col">
+    <section class="panel">
+      <div class="section-head">
+        <h2>Хранилище</h2>
+        <span class="badge badge-ok">SQLite</span>
+      </div>
+      <div class="stats">
+        <div class="stat">
+          <span class="stat-value">{{.Stats.Objects}}</span>
+          <span class="stat-label">объектов</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">{{.Stats.Meters}}</span>
+          <span class="stat-label">приборов</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">{{.Stats.Readings}}</span>
+          <span class="stat-label">показаний</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">{{size .Stats.DBBytes}}</span>
+          <span class="stat-label">база</span>
+        </div>
+      </div>
+      {{if .Stats.Oldest}}
+      <p class="hint">Данные за период {{.Stats.Oldest}} — {{.Stats.Newest}}.</p>
+      {{end}}
+      <dl class="kv">
+        <div><dt>Файл базы</dt><dd class="mono">{{.DBPath}}</dd></div>
+        <div><dt>Резервные копии</dt><dd class="mono">{{.BackupDir}}</dd></div>
+        <div><dt>Порт</dt><dd>{{.Port}}</dd></div>
+        <div><dt>Часовой пояс</dt><dd>{{.Timezone}}</dd></div>
+        <div><dt>Работает</dt><dd>{{.Uptime}}</dd></div>
+      </dl>
+    </section>
+
+    <section class="panel" id="server">
+      <div class="section-head">
+        <h2>Сервер</h2>
+        <span class="pill">{{.Port}}</span>
+      </div>
+      <p class="hint">Порт веб-интерфейса. После смены откроется новый адрес — обновите закладку.</p>
+      <form method="post" action="/settings/port" class="port-form">
+        <input type="text" name="port" value="{{.Port}}" inputmode="numeric" autocomplete="off" aria-label="Порт">
+        <button class="btn" type="submit">Сменить порт</button>
+      </form>
+    </section>
+
+    <section class="panel" id="backup">
+      <div class="section-head">
+        <h2>Резервные копии</h2>
+        <form method="post" action="/settings/backup">
+          <button class="btn btn-primary btn-sm" type="submit">Создать копию</button>
+        </form>
+      </div>
+      <p class="hint">Копия создаётся автоматически раз в месяц, при первом запуске в новом месяце. Хранятся последние 14. Перед важными изменениями сделайте копию вручную.</p>
+
+      <form method="post" action="/settings/backup-email" class="backup-mail">
+        <label class="check">
+          <input type="checkbox" name="backup_email_enabled" value="1" {{if .BackupEmailEnabled}}checked{{end}}>
+          <span>Дублировать резервную копию на почту</span>
+        </label>
+        <div class="send-row">
+          <input type="email" name="backup_email" value="{{.BackupEmail}}" placeholder="name@example.com" autocomplete="off">
+          <button class="btn" type="submit">Сохранить</button>
+        </div>
+        {{if not .SMTP.Ready}}<p class="hint">Почта ещё не настроена — письма начнут отправляться после настройки SMTP.</p>{{end}}
+      </form>
+
+      {{if .Backups}}
+      <ul class="backups">
+        {{range .Backups}}
+        <li>
+          <span class="backup-name">{{.Name}}</span>
+          <span class="backup-meta">{{dateTimeRu .Time}} · {{size .Size}}</span>
+          <span class="backup-actions">
+            <a class="iconbtn" href="/settings/backup/{{.Name}}" aria-label="Скачать {{.Name}}" download>{{template "icon-download"}}</a>
+            <form method="post" action="/settings/restore/{{.Name}}"
+                  data-confirm="Восстановить данные из копии {{.Name}}? Текущие данные будут заменены. Перед заменой автоматически создаётся ещё одна копия.">
+              <button class="iconbtn" type="submit" aria-label="Восстановить из копии {{.Name}}">{{template "icon-restore"}}</button>
+            </form>
+          </span>
+        </li>
+        {{end}}
+      </ul>
+      <p class="hint">Всего {{len .Backups}} {{plural (len .Backups) "копия" "копии" "копий"}} · {{size .BackupsSize}}</p>
+      {{else}}
+      <p class="muted">Копий пока нет.</p>
+      {{end}}
+    </section>
+
+
+  </div>
+
+  <div class="settings-col">
+    <section class="panel" id="mail">
+      <div class="section-head">
+        <h2>Почта</h2>
+        {{if .SMTP.Ready}}<span class="badge badge-ok">настроена</span>{{else}}<span class="badge">не настроена</span>{{end}}
+      </div>
+      <p class="hint">Через этот SMTP отправляются сведения и ведомости в PDF на почту водоканала, энергосбыта или свою.</p>
+      <form method="post" action="/settings/smtp" class="form">
+        <div class="form-grid">
+          <div class="field span-2">
+            <label for="host">SMTP-сервер</label>
+            <input id="host" type="text" name="host" value="{{.SMTP.Host}}" placeholder="smtp.yandex.ru" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="smtp_port">Порт</label>
+            <input id="smtp_port" type="text" name="port" value="{{.SMTP.Port}}" inputmode="numeric" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="tls">Шифрование</label>
+            <select id="tls" name="tls">
+              <option value="auto" {{if eq .SMTP.TLS "auto"}}selected{{end}}>Авто (465 / STARTTLS)</option>
+              <option value="ssl" {{if eq .SMTP.TLS "ssl"}}selected{{end}}>SSL</option>
+              <option value="starttls" {{if eq .SMTP.TLS "starttls"}}selected{{end}}>STARTTLS</option>
+              <option value="none" {{if eq .SMTP.TLS "none"}}selected{{end}}>Без шифрования</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="user">Пользователь</label>
+            <input id="user" type="text" name="user" value="{{.SMTP.User}}" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="password">Пароль</label>
+            <input id="password" name="password" type="password" value="" autocomplete="new-password"
+                   placeholder="{{if .SMTP.HasPassword}}сохранён — оставьте пустым{{else}}пароль приложения{{end}}">
+          </div>
+          <div class="field">
+            <label for="from">Адрес отправителя</label>
+            <input id="from" type="email" name="from" value="{{.SMTP.From}}" placeholder="uchet@example.ru" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="from_name">Имя отправителя</label>
+            <input id="from_name" type="text" name="from_name" value="{{.SMTP.FromName}}" placeholder="MeterZone" autocomplete="off">
+          </div>
+        </div>
+        {{if .SMTP.HasPassword}}
+        <label class="check">
+          <input type="checkbox" name="clear_password" value="1">
+          <span>Удалить сохранённый пароль</span>
+        </label>
+        {{end}}
+        <div class="form-actions">
+          <button class="btn btn-primary" type="submit">Сохранить почту</button>
+        </div>
+      </form>
+
+      <form method="post" action="/settings/smtp/test" class="smtp-test">
+        <div class="field">
+          <label for="test_email">Проверка: отправить тестовое письмо</label>
+          <div class="input-row">
+            <input id="test_email" type="email" name="test_email" placeholder="можно оставить пустым — на адрес отправителя" autocomplete="off">
+            <button class="btn" type="submit">Проверить</button>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="section-head">
+        <h2>Экспорт</h2>
+      </div>
+      <p class="hint">Все показания одним файлом CSV — открывается в Excel и Google Таблицах.</p>
+      <a class="btn btn-ghost" href="/export.csv">{{template "icon-download"}} Скачать CSV</a>
+    </section>
+
+    <section class="panel" id="import">
+      <div class="section-head">
+        <h2>Импорт старой базы</h2>
+      </div>
+      <p class="hint">
+        Загрузите файл <span class="mono">meterzone.db</span> от прежней версии.
+        Объекты, приборы, показания и начисления добавятся как новые; текущие данные не изменятся.
+      </p>
+      <form method="post" action="/settings/import" enctype="multipart/form-data" class="import-form">
+        <input type="file" name="file" accept=".db,.sqlite,.sqlite3" required>
+        <button class="btn" type="submit">Импортировать</button>
+      </form>
+    </section>
+
+    <section class="panel panel-quiet">
+      <div class="section-head">
+        <h2>О приложении</h2>
+        <span class="badge">v{{.Version}}</span>
+      </div>
+      <p class="hint">
+        MeterZone — локальный учёт показаний, начислений и дублирующих счётчиков для дома и коммерческих помещений.
+        Работает на роутере Keenetic, данные не покидают вашу сеть.
+        PDF формируется на устройстве, кириллица встроена в шрифт DejaVu Sans.
+      </p>
+      <p class="about-by">MeterZone by OGNIS</p>
+    </section>
+  </div>
+</div>
+{{end}}

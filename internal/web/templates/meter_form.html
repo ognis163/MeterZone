@@ -1,0 +1,113 @@
+{{define "page"}}
+<nav class="crumbs" aria-label="Путь">
+  <a href="/objects">Объекты</a>
+  <span aria-hidden="true">/</span>
+  <a href="/objects/{{.Object.ID}}/edit">{{.Object.Title}}</a>
+  <span aria-hidden="true">/</span>
+  <span>{{if .IsNew}}Новый прибор{{else}}{{.Meter.Title}}{{end}}</span>
+</nav>
+
+<section class="page-head">
+  <div>
+    <h1>{{if .IsNew}}Новый прибор{{else}}Прибор учёта{{end}}</h1>
+    <p class="muted">{{.Object.Title}}{{if .Object.Address}} · {{.Object.Address}}{{end}}</p>
+  </div>
+</section>
+
+<form method="post" action="/meters/save" class="panel form form-page">
+  {{if not .IsNew}}<input type="hidden" name="id" value="{{.Meter.ID}}">{{end}}
+  <input type="hidden" name="object_id" value="{{.Object.ID}}">
+
+  <div class="form-grid">
+    <div class="field">
+      <label for="resource">Ресурс</label>
+      <select id="resource" name="resource" required>
+        {{range .Resources}}
+        <option value="{{.}}" {{if eq . $.Meter.Resource}}selected{{end}}>{{.Label}}</option>
+        {{end}}
+      </select>
+    </div>
+    <div class="field">
+      <label for="label">Место установки</label>
+      <input id="label" type="text" name="label" value="{{.Meter.Label}}" maxlength="80"
+             placeholder="Кухня, подвал, щиток" autocomplete="off">
+    </div>
+
+    <div class="field">
+      <label for="brand">Марка</label>
+      <input id="brand" type="text" name="brand" value="{{.Meter.Brand}}" maxlength="80" autocomplete="off"
+             placeholder="Например, СВК-15">
+    </div>
+    <div class="field">
+      <label for="serial">Заводской номер</label>
+      <input id="serial" type="text" name="serial" value="{{.Meter.Serial}}" maxlength="60" autocomplete="off">
+    </div>
+
+    <div class="field">
+      <label for="start_value">Начальное показание</label>
+      <input id="start_value" type="text" name="start_value" value="{{fmtInput .Meter.StartValue}}"
+             inputmode="decimal" autocomplete="off" placeholder="0">
+      <p class="hint">От него считается первый расход.</p>
+    </div>
+    <div class="field">
+      <label for="installed_on">Дата установки</label>
+      <input id="installed_on" type="text" name="installed_on" value="{{.Meter.InstalledOn}}"
+             placeholder="ГГГГ-ММ-ДД" inputmode="numeric" autocomplete="off">
+      <p class="hint">Необязательно.</p>
+    </div>
+
+    <div class="field span-2">
+      <label for="parent_id">Родительский прибор</label>
+      <select id="parent_id" name="parent_id">
+        <option value="0">Нет — самостоятельный прибор</option>
+        {{range .ParentOptions}}
+        <option value="{{.ID}}" {{if eq .ID $.Meter.ParentID}}selected{{end}}>
+          {{.Title}}{{if .Detail}} · {{.Detail}}{{end}} — {{.Resource.Label}}
+        </option>
+        {{end}}
+      </select>
+      <p class="hint">Если это дублирующий счётчик, выберите основной прибор того же ресурса: покажем смещение и расчёт показаний для отправки.</p>
+    </div>
+
+    <div class="field field-short">
+      <label for="sort">Порядок в списке</label>
+      <input id="sort" type="number" name="sort" value="{{.Meter.Sort}}" min="0" max="999" inputmode="numeric">
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="finance_mode">Финансовый учёт</label>
+    <select id="finance_mode" name="finance_mode">
+      <option value="none" {{if eq .Meter.FinanceModeValue "none"}}selected{{end}}>Не вести</option>
+      <option value="advance" {{if eq .Meter.FinanceModeValue "advance"}}selected{{end}}>Только аванс</option>
+      <option value="bill" {{if eq .Meter.FinanceModeValue "bill"}}selected{{end}}>Только счёт</option>
+      <option value="both" {{if eq .Meter.FinanceModeValue "both"}}selected{{end}}>Аванс и счёт</option>
+    </select>
+    <p class="hint">Что показывать в блоке «Авансы | Счета» для этого прибора.</p>
+  </div>
+
+  {{if not .IsNew}}
+  <label class="check">
+    <input type="checkbox" name="archived" value="1" {{if .Meter.Archived}}checked{{end}}>
+    <input type="hidden" name="archived_present" value="1">
+    <span>Снят с учёта — прибор останется в истории</span>
+  </label>
+  {{end}}
+
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">Сохранить</button>
+    <a class="btn btn-ghost" href="/objects/{{.Object.ID}}/edit">Отмена</a>
+  </div>
+</form>
+
+{{if not .IsNew}}
+<section class="panel panel-danger">
+  <h2 class="h2">Удаление</h2>
+  <p class="hint">Удаление прибора удалит и все его показания. Для замены счётчика лучше поставить его в архив и добавить новый.</p>
+  <form method="post" action="/meters/{{.Meter.ID}}/delete"
+        data-confirm="Удалить прибор и все его показания? Это нельзя отменить.">
+    <button class="btn btn-danger" type="submit">Удалить прибор</button>
+  </form>
+</section>
+{{end}}
+{{end}}
