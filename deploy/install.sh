@@ -1,12 +1,13 @@
 #!/bin/sh
 # MeterZone — установка на Keenetic / Entware (aarch64) одной командой.
-# Запуск: curl -fsSL https://raw.githubusercontent.com/ognis163/MeterZone/refs/heads/main/deploy/install.sh | sh
+# Запуск: curl -fsSL https://raw.githubusercontent.com/ognis163/MeterZone/refs/heads/main/deploy/install.sh | tr -d '\r' | /opt/bin/sh
 set -eu
 
 APP_DIR=/opt/meterzone
 BIN="$APP_DIR/meterzone"
 INIT="$APP_DIR/S99meterzone"
 PORT=${PORT:-8099}
+APP_TZ=${APP_TZ:-}
 REPO=ognis163/MeterZone
 ASSET=meterzone-linux-arm64
 BASE="https://github.com/$REPO/releases/latest/download"
@@ -57,6 +58,8 @@ mv "$TMP.bin" "$BIN"
 chmod 755 "$BIN"
 
 say "Настраиваю автозапуск..."
+TZ_LINE=""
+[ -n "$APP_TZ" ] && TZ_LINE="TZ=$APP_TZ APP_TZ=$APP_TZ"
 cat > "$INIT" <<EOF
 #!/bin/sh
 # MeterZone — учёт показаний приборов учёта (Keenetic / Entware)
@@ -76,7 +79,7 @@ case "\$1" in
     mkdir -p "\$APP_DIR/data"
     echo "Starting MeterZone on port \$PORT..."
     cd "\$APP_DIR" || exit 1
-    PORT=\$PORT HOST=0.0.0.0 ZONEINFO=/opt/share/zoneinfo \\
+    PORT=\$PORT HOST=0.0.0.0 $TZ_LINE ZONEINFO=/opt/share/zoneinfo \\
       APP_DB=\$APP_DIR/data/meterzone.db \\
       APP_BACKUP_DIR=\$APP_DIR/data/backups \\
       "\$APP_BIN" >> "\$LOG" 2>&1 &

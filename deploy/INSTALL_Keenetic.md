@@ -8,7 +8,7 @@ SQLite и шрифт встроены.
 На Keenetic с Entware, по SSH под root:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ognis163/MeterZone/refs/heads/main/deploy/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ognis163/MeterZone/refs/heads/main/deploy/install.sh | tr -d '\r' | /opt/bin/sh
 ```
 
 Скрипт скачает последний релиз для aarch64, установит в `/opt/meterzone`,
@@ -16,7 +16,7 @@ curl -fsSL https://raw.githubusercontent.com/ognis163/MeterZone/refs/heads/main/
 Существующая база не удаляется. Другой порт:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ognis163/MeterZone/refs/heads/main/deploy/install.sh | PORT=8090 sh
+curl -fsSL https://raw.githubusercontent.com/ognis163/MeterZone/refs/heads/main/deploy/install.sh | tr -d '\r' | PORT=8090 /opt/bin/sh
 ```
 
 ## 1. Сборка на ПК
