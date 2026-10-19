@@ -1948,4 +1948,11 @@ html, body { overscroll-behavior-x: none; }
   .jtable tfoot .jtd-month { position: sticky; left: 0; z-index: 2; background: var(--surface); }
   .jtable tbody tr.is-current .jtd-month { background: var(--accent-soft); }
 }.jscroll-hint { display: none; }
-@media (max-width: 759px) { .jscroll-hint { display: block; margin: 8px 0 0; } }
+@media (max-width: 759px) { .jscroll-hint { display: block; margin: 8px 0 0; } }/* На телефоне колонки настроек тоже должны дышать между панелями. */
+.settings-col { display: grid; gap: 16px; align-content: start; }
+/* Мобильные отступы между смысловыми блоками: не слипаются. */
+@media (max-width: 759px) {
+  .entry-main, .object-main, .settings-col, .settings-grid, .narrow-stack, .report-layout { gap: 20px; }
+  .object-grid { gap: 16px; }
+  .jtotals { gap: 14px; }
+}
