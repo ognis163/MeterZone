@@ -3,14 +3,17 @@
 {{define "moneygridcell"}}
 <td class="money-cell tone-{{.Tone}}{{if .Unpaid}} is-unpaid{{end}}{{if .Paid}} is-paid{{end}}"
     data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}">
-  <input class="num" type="text" inputmode="decimal" autocomplete="off" value="{{.Value}}"
-         aria-label="Сумма"{{if .Paid}} disabled{{end}}
-         data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}">
-  <button class="st {{.Status}}" type="button" data-toggle
-          data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}"
-          aria-pressed="{{if .Paid}}true{{else}}false{{end}}" title="{{.StatusRu}}">
-    <span class="sr-only">{{.StatusRu}}</span>
-  </button>
+  <span class="val">
+    <input class="num" type="text" inputmode="decimal" autocomplete="off" value="{{.Value}}"{{if not .HasSum}} placeholder="—"{{end}}
+           aria-label="Сумма"{{if .Paid}} disabled{{end}}
+           data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}">
+    <button class="paycheck{{if .Paid}} is-paid{{end}}" type="button"
+            data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}"
+            aria-pressed="{{if .Paid}}true{{else}}false{{end}}" title="{{.StatusRu}}">
+      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 6.5 4.5 9 10 3.5"/></svg>
+      <span class="sr-only">{{.StatusRu}}</span>
+    </button>
+  </span>
 </td>
 {{end}}
 
@@ -25,8 +28,8 @@
         <th rowspan="2" class="mr">Итого</th>
       </tr>
       <tr class="pay-sub">
-        {{range .AdvCols}}<th class="tone-{{.Tone}}" title="{{.Label}}">{{.Short}}</th>{{end}}
-        {{range .InvCols}}<th class="tone-{{.Tone}}" title="{{.Label}}">{{.Short}}</th>{{end}}
+        {{range .AdvCols}}<th class="acc tone-{{.Tone}}" title="{{.Label}}"><cite>{{.Short}}</cite></th>{{end}}
+        {{range .InvCols}}<th class="acc tone-{{.Tone}}" title="{{.Label}}"><cite>{{.Short}}</cite></th>{{end}}
       </tr>
     </thead>
     <tbody>

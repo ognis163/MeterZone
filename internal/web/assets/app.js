@@ -705,7 +705,7 @@
             var input = q("input.num", td);
             var v = input ? amount(input.value) : 0;
             sum += v;
-            if (q(".st.paid", td)) { paid += v; } else { due += v; }
+            if (q(".paycheck.is-paid", td)) { paid += v; } else { due += v; }
           });
           var out = q("td.total", tr);
           if (out) out.textContent = dash(sum);
@@ -715,14 +715,12 @@
       }
 
       function paint(td) {
-        var btn = q(".st", td), input = q("input.num", td);
+        var btn = q(".paycheck", td), input = q("input.num", td);
         if (!btn || !input) return;
         var v = amount(input.value);
-        var paid = v > 0 && btn.classList.contains("paid");
-        var state = paid ? "paid" : (v === 0 ? "empty" : "due");
+        var paid = v > 0 && btn.classList.contains("is-paid");
         var label = paid ? "Оплачен" : (v === 0 ? "Не задан" : "Не оплачен");
-        btn.classList.remove("paid", "due", "empty");
-        btn.classList.add(state);
+        btn.classList.toggle("is-paid", paid);
         btn.setAttribute("aria-pressed", paid ? "true" : "false");
         btn.setAttribute("title", label);
         var sr = q(".sr-only", btn);
@@ -764,18 +762,18 @@
           "|" + el.getAttribute("data-field");
       }
 
-      // Отметка оплаты: клик по точке.
+      // Отметка оплаты: клик по галочке справа от суммы.
       table.addEventListener("click", function (e) {
-        var btn = e.target.closest ? e.target.closest("button.st") : null;
+        var btn = e.target.closest ? e.target.closest("button.paycheck") : null;
         if (!btn || !table.contains(btn)) return;
         var td = btn.closest(".money-cell");
         var input = q("input.num", td);
         if (!input || amount(input.value) === 0) return;
-        btn.classList.toggle("paid");
+        btn.classList.toggle("is-paid");
         paint(td);
         recalc();
         var field = input.getAttribute("data-field") === "advance" ? "advance_paid" : "paid";
-        save(input, field, btn.classList.contains("paid") ? "1" : "");
+        save(input, field, btn.classList.contains("is-paid") ? "1" : "");
       });
 
       table.addEventListener("input", function (e) {

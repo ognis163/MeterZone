@@ -2534,68 +2534,90 @@ html, body { overscroll-behavior-x: none; }
 .pay[data-pay-edit="0"] .st { cursor: default; }
 .jcount { font-weight: 400; }
 /* ==========================================================================
-   Начисления в журнале: по колонке на каждый счёт
-   Цвет колонки подсказывает счёт: ХВС — синий, ГВС — красный, электро — янтарь.
+/* ==========================================================================
+   Начисления в журнале: по колонке на каждый счёт.
+   Спокойное оформление: цвет — мягкой плашкой у названия и лёгкой заливкой
+   неоплаченной ячейки; точки убраны, у полей нет рамок.
    ========================================================================== */
 
 .pay.grid { min-width: 0; }
-.pay.grid th, .pay.grid td { padding: 9px 8px; }
+.pay.grid th, .pay.grid td { padding: 10px 9px; }
 
 .pay-group {
   text-align: center !important;
-  font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
-  color: var(--muted); font-weight: 700;
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--faint); font-weight: 600;
   border-bottom: 1px solid var(--line);
 }
-.pay-sub th {
-  font-size: 11px; font-weight: 700;
-  padding-top: 0; padding-bottom: 7px;
+.pay-sub th.acc {
+  font-size: 11.5px; font-weight: 600; text-transform: none; letter-spacing: 0;
+  padding-top: 0; padding-bottom: 9px;
   border-bottom: 1px solid var(--line);
+}
+.pay-sub th.acc cite {
+  font-style: normal;
+  display: inline-block; padding: 1px 7px; border-radius: 5px;
+  background: color-mix(in srgb, var(--tone) 13%, transparent);
+  color: var(--ink-2);
 }
 
-.money-table-panel { --tone-cold: #2f6f8f; --tone-hot: #a8391f; --tone-energy: #8a6412; }
-:root[data-theme="dark"] .money-table-panel { --tone-cold: #7fb6d4; --tone-hot: #ff9a80; --tone-energy: #d3a04a; }
+.money-table-panel { --tone-cold: #6c93a6; --tone-hot: #a88274; --tone-energy: #9c8a5c; }
+:root[data-theme="dark"] .money-table-panel { --tone-cold: #7fa3b5; --tone-hot: #c09a8b; --tone-energy: #b3a075; }
 
 .tone-cold { --tone: var(--tone-cold); }
 .tone-hot { --tone: var(--tone-hot); }
 .tone-energy { --tone: var(--tone-energy); }
 
-.pay-sub th.tone-cold, .pay-sub th.tone-hot, .pay-sub th.tone-energy { color: var(--tone); }
-.pay-sub th::before {
-  content: ""; display: inline-block; width: 6px; height: 6px;
-  border-radius: 50%; background: var(--tone);
-  margin-right: 5px; vertical-align: 1px;
+/* Ячейка счёта: сумма как текст, галочка справа. */
+.pay .money-cell { padding: 6px 8px; }
+.pay .money-cell .val {
+  display: inline-flex; align-items: center; justify-content: flex-end;
+  gap: 6px; min-width: 74px;
 }
-
-/* Ячейка счёта: поле суммы и точка статуса. */
-.pay .money-cell { padding: 6px 4px; position: relative; }
-.pay .money-cell .cell { gap: 6px; }
 .pay .money-cell .num {
-  width: 78px; font-size: 13px;
-  border-color: var(--line); background: transparent;
+  width: 74px; min-height: 0; padding: 4px 2px;
+  font-size: 13.5px; text-align: right;
+  border: 0; border-radius: 6px;
+  background: transparent; color: var(--ink);
 }
-.pay .money-cell .num:focus { border-color: var(--tone); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 18%, transparent); }
-.pay .money-cell .num:disabled { background: transparent; border-color: transparent; color: var(--muted); }
+.pay .money-cell .num:hover { background: var(--surface-2); }
+.pay .money-cell .num:focus {
+  outline: none; background: var(--surface-2);
+  box-shadow: inset 0 -1.5px 0 var(--accent);
+}
+.pay .money-cell .num:disabled {
+  background: transparent; color: var(--ink);
+  -webkit-text-fill-color: var(--ink); opacity: 1; cursor: default;
+}
+.pay .money-cell .num::placeholder { color: var(--faint); }
 
 /* Неоплаченное — мягкая заливка цвета счёта. */
-.pay .money-cell.is-unpaid { background: color-mix(in srgb, var(--tone) 9%, transparent); }
-.pay .money-cell.is-unpaid .num { border-color: color-mix(in srgb, var(--tone) 45%, var(--line)); }
+.pay .money-cell.is-unpaid { background: color-mix(in srgb, var(--tone) 11%, transparent); }
+.pay .money-cell.is-paid .num { color: var(--muted); }
 
-.pay .money-cell .st { padding: 2px; }
-.pay .money-cell .st.paid { color: var(--tone); }
-.pay .money-cell .st.due { color: var(--tone); }
-.pay .money-cell .st.empty { color: var(--faint); }
+/* Галочка оплаты: у оплаченной ячейки видна, у неоплаченной — по наведению. */
+.pay .paycheck {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; padding: 0; flex: none;
+  border: 0; border-radius: 4px; background: none;
+  color: var(--ok); opacity: 0;
+  transition: opacity .12s ease, background .12s ease;
+}
+.pay .paycheck svg { width: 11px; height: 11px; }
+.pay .paycheck.is-paid { opacity: .55; }
+.pay .money-cell:hover .paycheck,
+.pay .money-cell:focus-within .paycheck { opacity: .9; }
+.pay .paycheck:hover { background: var(--surface-2); opacity: 1; }
+.pay .paycheck:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; opacity: 1; }
+@media (hover: none) { .pay .paycheck { opacity: .5; } }
 
-/* Оплачено — закрашенная точка, не оплачено — кольцо, пусто — бледное кольцо. */
-.pay .money-cell .st.paid::before { background: currentColor; }
-.pay .money-cell .st.due::before { background: none; box-shadow: inset 0 0 0 1.5px currentColor; }
-.pay .money-cell .st.empty::before { background: none; box-shadow: inset 0 0 0 1.2px currentColor; opacity: .55; }
-
-.pay .money-total { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
-.pay tfoot td { border-top: 1px solid var(--line-strong); }
+.pay .money-total { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); }
+.pay.grid tfoot td { border-top: 1px solid var(--line-strong); padding-top: 12px; }
+.pay.grid tfoot td.total { color: var(--ink); }
 
 @media (max-width: 759px) {
-  .pay.grid { min-width: 640px; }
-  .pay.grid th, .pay.grid td { padding: 8px 5px; }
-  .pay .money-cell .num { width: 66px; font-size: 12.5px; }
+  .pay.grid { min-width: 660px; }
+  .pay.grid th, .pay.grid td { padding: 9px 6px; }
+  .pay .money-cell .num { width: 66px; font-size: 13px; }
+  .pay .money-cell .val { min-width: 66px; }
 }
