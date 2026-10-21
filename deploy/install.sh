@@ -47,12 +47,23 @@ fetch "$BASE/$ASSET" "$TMP.bin" || die "не удалось скачать $BASE
 SIZE=$(wc -c < "$TMP.bin")
 [ "$SIZE" -gt 1000000 ] || die "скачался файл неверного размера ($SIZE байт)"
 
+# При обновлении сохраняем порт из текущего автозапуска: иначе установка
+# вернула бы 8099 и приложение «переехало» бы на другой адрес.
+if [ "$PORT" = "8099" ] && [ -f /opt/etc/init.d/S99meterzone ]; then
+  OLD_PORT=$(sed -n 's/^PORT=\([0-9][0-9]*\)$/\1/p' /opt/etc/init.d/S99meterzone | head -n 1)
+  [ -n "$OLD_PORT" ] && PORT="$OLD_PORT"
+fi
+
 if [ -x /opt/etc/init.d/S99meterzone ]; then
   say "Останавливаю прежнюю версию..."
   /opt/etc/init.d/S99meterzone stop >/dev/null 2>&1 || true
   sleep 1
 fi
 [ -f "$BIN" ] && cp "$BIN" "$BIN.prev" 2>/dev/null || true
+# База не удаляется, но перед обновлением кладём её копию рядом.
+if [ -f "$APP_DIR/data/meterzone.db" ]; then
+  cp "$APP_DIR/data/meterzone.db" "$APP_DIR/data/meterzone.db.before-update" 2>/dev/null || true
+fi
 
 mv "$TMP.bin" "$BIN"
 chmod 755 "$BIN"
