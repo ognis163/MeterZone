@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"indextro/internal/model"
@@ -35,29 +36,48 @@ func (s *Store) MoneyForMonth(objectID int64, period string) (map[model.Account]
 	return out, rows.Err()
 }
 
-// MoneyAccountIn возвращает записи одного лицевого счёта за период:
-// месяц → запись. Ключ — «YYYY-MM», как он хранится в базе.
-// Таблица начислений ведёт аванс и счёт в одной записи счёта, поэтому
-// остальные счета объекта в неё не подмешиваются.
-func (s *Store) MoneyAccountIn(objectID int64, account model.Account, from, to model.Period) (map[string]model.Record, error) {
-	accounts := []any{account}
-	if account == model.AccountWaterCold {
-		accounts = append(accounts, model.AccountWater) // старые данные
+// monthMoney — накопитель по месяцу при агрегации нескольких счетов.
+type monthMoney struct {
+	advSum, invSum   float64
+	advSeen, invSeen bool
+	advPaid, invPaid bool
+}
+
+// MoneyForAccountsIn суммирует начисления по набору счетов за период:
+// месяц → запись. Позиция считается оплаченной, только если оплачены все
+// счета набора, у которых она есть — так же, как в документах.
+func (s *Store) MoneyForAccountsIn(objectID int64, accounts []model.Account, from, to model.Period) (map[string]model.Record, error) {
+	out := map[string]model.Record{}
+	if len(accounts) == 0 {
+		return out, nil
+	}
+	args := []any{objectID, from.String(), to.String()}
+	holders := make([]string, 0, len(accounts)+1)
+	seen := map[model.Account]bool{}
+	for _, a := range accounts {
+		if seen[a] {
+			continue
+		}
+		seen[a] = true
+		holders = append(holders, "?")
+		args = append(args, string(a))
+		// Старые данные хранили воду под общим счётом.
+		if a == model.AccountWaterCold && !seen[model.AccountWater] {
+			seen[model.AccountWater] = true
+			holders = append(holders, "?")
+			args = append(args, string(model.AccountWater))
+		}
 	}
 	query := `SELECT period, charged, advance, advance_paid, paid_flag
-		FROM money WHERE object_id = ? AND period >= ? AND period <= ? AND account IN (?`
-	args := []any{objectID, from.String(), to.String(), accounts[0]}
-	for _, a := range accounts[1:] {
-		query += ", ?"
-		args = append(args, a)
-	}
-	query += ")"
+		FROM money WHERE object_id = ? AND period >= ? AND period <= ? AND account IN (` +
+		strings.Join(holders, ",") + `)`
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := map[string]model.Record{}
+
+	acc := map[string]*monthMoney{}
 	for rows.Next() {
 		var (
 			period              string
@@ -67,23 +87,40 @@ func (s *Store) MoneyAccountIn(objectID int64, account model.Account, from, to m
 		if err := rows.Scan(&period, &charged, &advance, &advancePaid, &paidFl); err != nil {
 			return nil, err
 		}
-		rec := out[period]
-		rec.Period = period
-		rec.InvoiceSum = model.Round2(rec.InvoiceSum + charged)
-		rec.AdvanceSum = model.Round2(rec.AdvanceSum + advance)
-		rec.InvoicePaid = rec.InvoicePaid || paidFl != 0
-		rec.AdvancePaid = rec.AdvancePaid || advancePaid != 0
-		out[period] = rec
+		m := acc[period]
+		if m == nil {
+			m = &monthMoney{advPaid: true, invPaid: true}
+			acc[period] = m
+		}
+		m.advSum += advance
+		m.invSum += charged
+		if advance != 0 {
+			m.advSeen = true
+			if advancePaid == 0 {
+				m.advPaid = false
+			}
+		}
+		if charged != 0 {
+			m.invSeen = true
+			if paidFl == 0 {
+				m.invPaid = false
+			}
+		}
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for period, m := range acc {
+		out[period] = model.Record{
+			Period:      period,
+			AdvanceSum:  model.Round2(m.advSum),
+			InvoiceSum:  model.Round2(m.invSum),
+			AdvancePaid: m.advSeen && m.advPaid,
+			InvoicePaid: m.invSeen && m.invPaid,
+		}
+	}
+	return out, nil
 }
-
-// MoneyAccountForYear возвращает записи одного лицевого счёта за год.
-func (s *Store) MoneyAccountForYear(objectID int64, account model.Account, year int) (map[string]model.Record, error) {
-	return s.MoneyAccountIn(objectID, account,
-		model.Period{Year: year, Month: 1}, model.Period{Year: year, Month: 12})
-}
-
 // SaveMoney сохраняет счета, авансы и отметки об оплате за месяц.
 // Частичное обновление: сохраняются только переданные счета, остальные не трогаются.
 func (s *Store) SaveMoney(items []model.Money, period string) error {

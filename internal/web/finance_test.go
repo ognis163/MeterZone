@@ -106,3 +106,37 @@ func TestRecordTotals(t *testing.T) {
 		t.Fatalf("оплаченный аванс: к оплате %v", got)
 	}
 }
+
+// TestJournalMoneyRespectsScope — блок «Начисления» в журнале суммирует
+// только те счета, которые выбраны фильтром «Что включить».
+func TestJournalMoneyRespectsScope(t *testing.T) {
+	_, st, h := newTestServer(t)
+	period := "2026-10"
+	items := []model.Money{
+		{ObjectID: 1, Period: period, Account: model.AccountWaterCold, Charged: 1000, PaidFlag: true},
+		{ObjectID: 1, Period: period, Account: model.AccountWaterHot, Charged: 500, PaidFlag: true},
+		{ObjectID: 1, Period: period, Account: model.AccountEnergy, Charged: 3000, PaidFlag: true},
+	}
+	for _, it := range items {
+		if err := st.SaveMoney([]model.Money{it}, period); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	cases := map[string]string{
+		"all":    "4 500 ₽",
+		"water":  "1 500 ₽",
+		"energy": "3 000 ₽",
+	}
+	for scope, want := range cases {
+		rr := request(t, h, http.MethodGet,
+			"/journal?object=1&from=2026-10&to=2026-10&scope="+scope, nil, "")
+		if rr.Code != http.StatusOK {
+			t.Fatalf("%s: код %d", scope, rr.Code)
+		}
+		body := rr.Body.String()
+		if !strings.Contains(body, "data-total>"+want) {
+			t.Fatalf("%s: нет итога %q в строке месяца", scope, want)
+		}
+	}
+}

@@ -90,7 +90,7 @@
      периоду журнала: суммы и отметки об оплате правятся прямо здесь. */}}
 <section class="panel money-table-panel" data-pay-table data-object="{{.Object.ID}}">
   <div class="section-head">
-    <h2>Начисления за {{.MoneyRange.RangeLabel}}</h2>
+    <h2>Начисления за {{.MoneyRange.RangeLabel}} <span class="jcount">· {{.MoneyRange.AccountLbl}}</span></h2>
     <div class="section-head-side">
       {{template "paysummary" .MoneyRange.Totals}}
       <a class="btn btn-ghost btn-sm" href="{{.MoneyRange.StatementHref}}">{{template "icon-print"}} Печать/отправить</a>
@@ -98,9 +98,9 @@
   </div>
   {{template "paytable" (paytable .MoneyRange)}}
   {{if not .MoneyAny}}
-  <p class="hint">Авансы и счета пока не заполнены — впишите суммы за нужные месяцы прямо в таблице.</p>
+  <p class="hint">Авансы и счета пока не заполнены — впишите суммы на <a href="/?object={{.Object.ID}}">главной</a>.</p>
   {{else}}
-  <p class="hint">Аванс и счёт по каждому месяцу, «Итого» — их сумма. Нажмите на статус, чтобы отметить оплату: оплаченная сумма блокируется.</p>
+  <p class="hint">Суммы по счетам, выбранным в фильтре. Изменить аванс, счёт или отметку оплаты можно <a href="/?object={{.Object.ID}}">на главной</a> — там каждый счёт отдельно.</p>
   {{end}}
 </section>
 {{end}}

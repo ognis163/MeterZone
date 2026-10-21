@@ -191,7 +191,7 @@
 {{define "paycell"}}
 <div class="cell">
   <input class="num" type="number" min="0" inputmode="decimal" value="{{.SumValue}}"
-         aria-label="Сумма"{{if .Paid}} disabled{{end}}
+         aria-label="Сумма"{{if or .Paid .Locked}} disabled{{end}}
          data-p='{{.Period}}' data-f="{{.Field}}"{{if not .HasSum}} data-empty="1"{{end}}>
   <button class="st {{.Status}}" type="button"
           data-p='{{.Period}}' data-f="{{.Field}}" data-paid="{{if .Paid}}1{{end}}"

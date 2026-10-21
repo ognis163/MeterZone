@@ -178,7 +178,7 @@ func (s *Server) buildDocRequest(r *http.Request) (docRequest, error) {
 		if from.MonthDiff(to) > 120 {
 			return docRequest{}, fmt.Errorf("период больше 10 лет")
 		}
-		yd := s.buildMoneyRange(obj, from, to, model.PeriodOf(now), false)
+		yd := s.buildMoneyRange(obj, from, to, model.PeriodOf(now), scope, false)
 		return docRequest{
 			doc:   chargesDocument(yd),
 			obj:   obj,

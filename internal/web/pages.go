@@ -178,59 +178,6 @@ func moneyRowsWithInput(charged, advance map[model.Account]string,
 
 // ---------------------------------------------------------------- строки начислений
 
-// journalMoneyAccount — лицевой счёт, в котором журнал ведёт авансы и счета.
-// Сначала берём счета, у которых включён финучёт по приборам, иначе первое
-// хранилище начислений объекта, иначе холодную воду — чтобы у нового объекта
-// ввод в журнале сохранялся, а не уходил в никуда.
-func (s *Server) journalMoneyAccount(objectID int64, period model.Period) model.Account {
-	if meters, err := s.Store.Meters(objectID, true); err == nil {
-		for _, acc := range model.AccountOrder {
-			for _, m := range meters {
-				if m.FinanceModeValue() == model.FinanceNone {
-					continue
-				}
-				switch acc {
-				case model.AccountWaterCold:
-					if m.Resource == model.WaterCold {
-						return acc
-					}
-				case model.AccountWaterHot:
-					if m.Resource == model.WaterHot {
-						return acc
-					}
-				case model.AccountEnergy:
-					if m.Resource == model.Energy {
-						return acc
-					}
-				}
-			}
-		}
-	}
-	if all, err := s.Store.MoneyForMonth(objectID, period.String()); err == nil {
-		for _, acc := range model.AccountOrder {
-			if _, ok := all[acc]; ok {
-				return acc
-			}
-			if acc == model.AccountWaterCold {
-				if _, ok := all[model.AccountWater]; ok {
-					return model.AccountWater
-				}
-			}
-		}
-	}
-	return model.AccountWaterCold
-}
-
-func (s *Server) moneyRowForObject(objectID int64, period model.Period) model.Record {
-	all, err := s.Store.MoneyForMonth(objectID, period.String())
-	if err != nil {
-		return model.Record{Period: period.String()}
-	}
-	rec := all[s.journalMoneyAccount(objectID, period)].Record()
-	rec.Period = period.String()
-	return rec
-}
-
 // ---------------------------------------------------------------- главная
 
 type objectCardView struct {
@@ -1050,7 +997,7 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 	// «Итоги» — та же сетка, что у начислений: месяц и колонки по ресурсам.
 	// выбранному периоду журнала: строка на каждый месяц диапазона.
 	// Здесь же можно менять суммы и отметки оплаты.
-	data.MoneyRange = s.buildMoneyRange(obj, from, to, today, true)
+	data.MoneyRange = s.buildMoneyRange(obj, from, to, today, scope, false)
 	// Ведомость начислений открывается той же страницей документа, что и остальные.
 	data.MoneyRange.StatementHref = reportPreviewHref(obj.ID, "charges", scope, to, from, to)
 

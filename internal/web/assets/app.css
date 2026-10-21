@@ -2524,3 +2524,12 @@ html, body { overscroll-behavior-x: none; }
   .jrange-export .jrange-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; margin: 0; }
   .jrange-export .btn { width: 100%; padding: 0 6px; font-size: 12px; }
 }
+/* Начисления в журнале — только для чтения: суммы правим на главной. */
+.pay[data-pay-edit="0"] .num:disabled {
+  background: transparent; border-color: transparent;
+  padding-left: 0; padding-right: 0;
+  color: var(--ink); -webkit-text-fill-color: var(--ink);
+}
+.pay[data-pay-edit="0"] .num[value=""] { color: var(--faint); }
+.pay[data-pay-edit="0"] .st { cursor: default; }
+.jcount { font-weight: 400; }
