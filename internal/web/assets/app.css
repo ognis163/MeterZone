@@ -2533,3 +2533,69 @@ html, body { overscroll-behavior-x: none; }
 .pay[data-pay-edit="0"] .num[value=""] { color: var(--faint); }
 .pay[data-pay-edit="0"] .st { cursor: default; }
 .jcount { font-weight: 400; }
+/* ==========================================================================
+   Начисления в журнале: по колонке на каждый счёт
+   Цвет колонки подсказывает счёт: ХВС — синий, ГВС — красный, электро — янтарь.
+   ========================================================================== */
+
+.pay.grid { min-width: 0; }
+.pay.grid th, .pay.grid td { padding: 9px 8px; }
+
+.pay-group {
+  text-align: center !important;
+  font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); font-weight: 700;
+  border-bottom: 1px solid var(--line);
+}
+.pay-sub th {
+  font-size: 11px; font-weight: 700;
+  padding-top: 0; padding-bottom: 7px;
+  border-bottom: 1px solid var(--line);
+}
+
+.money-table-panel { --tone-cold: #2f6f8f; --tone-hot: #a8391f; --tone-energy: #8a6412; }
+:root[data-theme="dark"] .money-table-panel { --tone-cold: #7fb6d4; --tone-hot: #ff9a80; --tone-energy: #d3a04a; }
+
+.tone-cold { --tone: var(--tone-cold); }
+.tone-hot { --tone: var(--tone-hot); }
+.tone-energy { --tone: var(--tone-energy); }
+
+.pay-sub th.tone-cold, .pay-sub th.tone-hot, .pay-sub th.tone-energy { color: var(--tone); }
+.pay-sub th::before {
+  content: ""; display: inline-block; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--tone);
+  margin-right: 5px; vertical-align: 1px;
+}
+
+/* Ячейка счёта: поле суммы и точка статуса. */
+.pay .money-cell { padding: 6px 4px; position: relative; }
+.pay .money-cell .cell { gap: 6px; }
+.pay .money-cell .num {
+  width: 78px; font-size: 13px;
+  border-color: var(--line); background: transparent;
+}
+.pay .money-cell .num:focus { border-color: var(--tone); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone) 18%, transparent); }
+.pay .money-cell .num:disabled { background: transparent; border-color: transparent; color: var(--muted); }
+
+/* Неоплаченное — мягкая заливка цвета счёта. */
+.pay .money-cell.is-unpaid { background: color-mix(in srgb, var(--tone) 9%, transparent); }
+.pay .money-cell.is-unpaid .num { border-color: color-mix(in srgb, var(--tone) 45%, var(--line)); }
+
+.pay .money-cell .st { padding: 2px; }
+.pay .money-cell .st.paid { color: var(--tone); }
+.pay .money-cell .st.due { color: var(--tone); }
+.pay .money-cell .st.empty { color: var(--faint); }
+
+/* Оплачено — закрашенная точка, не оплачено — кольцо, пусто — бледное кольцо. */
+.pay .money-cell .st.paid::before { background: currentColor; }
+.pay .money-cell .st.due::before { background: none; box-shadow: inset 0 0 0 1.5px currentColor; }
+.pay .money-cell .st.empty::before { background: none; box-shadow: inset 0 0 0 1.2px currentColor; opacity: .55; }
+
+.pay .money-total { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.pay tfoot td { border-top: 1px solid var(--line-strong); }
+
+@media (max-width: 759px) {
+  .pay.grid { min-width: 640px; }
+  .pay.grid th, .pay.grid td { padding: 8px 5px; }
+  .pay .money-cell .num { width: 66px; font-size: 12.5px; }
+}

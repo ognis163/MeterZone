@@ -27,6 +27,8 @@ type moneyCellView struct {
 	StatusRu string
 	// Locked — поле только для чтения (таблица в журнале).
 	Locked bool
+	// Toggleable — статус оплаты можно переключить прямо в таблице.
+	Toggleable bool
 }
 
 // moneyTableRowView — строка месяца в таблице начислений.

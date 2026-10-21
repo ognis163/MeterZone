@@ -61,6 +61,13 @@ func (s *Server) buildMoneyRange(obj model.Object, from, to model.Period,
 		if !editable {
 			row.Advance.Locked = true
 			row.Invoice.Locked = true
+			// При фильтре «Вода» или «Электро» набор счетов однозначен —
+			// отметку оплаты можно ставить прямо здесь. При «Всё» непонятно,
+			// какие счета оплачены, поэтому там только просмотр.
+			if scope != "all" {
+				row.Advance.Toggleable = true
+				row.Invoice.Toggleable = true
+			}
 		}
 		data.Rows = append(data.Rows, row)
 		if row.HasAny {

@@ -43,6 +43,45 @@ type monthMoney struct {
 	advPaid, invPaid bool
 }
 
+// MoneyGridIn возвращает начисления объекта за период по каждому счёту:
+// период → счёт → запись. Журнал показывает по колонке на счёт.
+func (s *Store) MoneyGridIn(objectID int64, from, to model.Period) (map[string]map[model.Account]model.Record, error) {
+	out := map[string]map[model.Account]model.Record{}
+	rows, err := s.db.Query(`SELECT period, account, charged, advance, advance_paid, paid_flag
+		FROM money WHERE object_id = ? AND period >= ? AND period <= ?`,
+		objectID, from.String(), to.String())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			period, account     string
+			charged, advance    float64
+			advancePaid, paidFl int
+		)
+		if err := rows.Scan(&period, &account, &charged, &advance, &advancePaid, &paidFl); err != nil {
+			return nil, err
+		}
+		acc := model.Account(account)
+		if acc == model.AccountWater {
+			acc = model.AccountWaterCold // старые данные
+		}
+		byAcc := out[period]
+		if byAcc == nil {
+			byAcc = map[model.Account]model.Record{}
+			out[period] = byAcc
+		}
+		rec := byAcc[acc]
+		rec.Period = period
+		rec.InvoiceSum = model.Round2(rec.InvoiceSum + charged)
+		rec.AdvanceSum = model.Round2(rec.AdvanceSum + advance)
+		rec.InvoicePaid = rec.InvoicePaid || paidFl != 0
+		rec.AdvancePaid = rec.AdvancePaid || advancePaid != 0
+		byAcc[acc] = rec
+	}
+	return out, rows.Err()
+}
 // MoneyForAccountsIn суммирует начисления по набору счетов за период:
 // месяц → запись. Позиция считается оплаченной, только если оплачены все
 // счета набора, у которых она есть — так же, как в документах.

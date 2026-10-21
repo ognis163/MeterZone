@@ -671,202 +671,124 @@
   })();
 
   // --------------------------------------------------------------------
-  // Таблица «Авансы и счета»: в журнале только показывает, на странице
-  // «Начисления» — вводит суммы и отметки об оплате. Сохранение — обычными
-  // формами в /o/{id}/money, очередь одна на страницу, чтобы перед PDF,
-  // печатью и отправкой письма дописать всё.
+  // --------------------------------------------------------------------
+  // Начисления в журнале: у каждого счёта своя колонка в «Авансе» и «Счёте».
+  // Сумма и отметка оплаты сохраняются сразу, сводка пересчитывается на месте.
   // --------------------------------------------------------------------
   (function () {
-    var panels = qa("[data-pay-table]");
-    if (!panels.length) return;
+    var grids = qa("[data-money-grid]");
+    if (!grids.length) return;
 
-    var queue = [];
-    var busy = false;
-    var moneyFmt0 = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 });
-
-    function money(v) { return moneyFmt0.format(round2(v)) + " ₽"; }
-    function totalText(v) { return round2(v) === 0 ? "—" : money(v); }
+    var fmt = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 });
+    function money(v) { return fmt.format(round2(v)) + " ₽"; }
+    function dash(v) { return round2(v) === 0 ? "—" : money(v); }
     function amount(raw) {
       var v = parseVal(raw);
       return v == null || v < 0 ? 0 : round2(v);
     }
 
-    function enqueue(job) {
-      queue.push(job);
-      pump();
-    }
+    grids.forEach(function (table) {
+      var panel = table.closest("[data-pay-panel]") || table.closest("section");
+      var objectID = table.getAttribute("data-object") ||
+        (panel ? panel.getAttribute("data-object") : "") || "";
+      var paidOut = panel ? panel.querySelector("[data-pay-paid]") : null;
+      var dueOut = panel ? panel.querySelector("[data-pay-due]") : null;
+      var timers = {};
 
-    function pump() {
-      if (busy) return;
-      var job = queue.shift();
-      if (!job) return;
-      busy = true;
-      job().catch(function (err) {
-        setStatus("Не сохранено: " + ((err && err.message) || "ошибка"), "error");
-      }).then(function () {
-        busy = false;
-        pump();
-      });
-    }
+      function cells(tr) { return qa("td.money-cell", tr); }
 
-    function flush() {
-      return new Promise(function (resolve) {
-        (function wait() {
-          if (!busy && !queue.length) return resolve();
-          setTimeout(wait, 60);
-        })();
-      });
-    }
-
-    // PDF пережидает очередь сохранения.
-    qa("a[href*='/pdf']").forEach(function (link) {
-      link.addEventListener("click", function (e) {
-        if (!busy && !queue.length) return;
-        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-        e.preventDefault();
-        flush().then(function () { window.location.href = link.href; });
-      });
-    });
-    qa("form[action='/charges/send'], form[action='/reports/send']").forEach(function (form) {
-      form.addEventListener("submit", function (e) {
-        if (!busy && !queue.length) return;
-        e.preventDefault();
-        flush().then(function () { form.submit(); });
-      });
-    });
-    qa("[data-print]").forEach(function (btn) {
-      btn.addEventListener("click", function (e) {
-        if (!busy && !queue.length) return;
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        flush().then(function () { window.print(); });
-      }, true);
-    });
-
-    function markSaved() {
-      var d = new Date();
-      var hh = String(d.getHours()).padStart(2, "0");
-      var mm = String(d.getMinutes()).padStart(2, "0");
-      setStatus("Сохранено " + hh + ":" + mm, "ok");
-    }
-
-    panels.forEach(function (panel) {
-      var objectID = panel.getAttribute("data-object") || "";
-      var table = q("table.pay", panel);
-      if (!table) return;
-
-      var paidOut = panel.querySelector("[data-pay-paid]");
-      var dueOut = panel.querySelector("[data-pay-due]");
-      var foot = table.querySelector("[data-total-row]");
-      var editable = table.getAttribute("data-pay-edit") === "1";
-
-      // Каждая позиция вносит вклад либо в «оплачено», либо в «к оплате»;
-      // пустая не влияет ни на что, как в эталоне.
-      function contribution(input, btn) {
-        var v = amount(input.value);
-        if (v === 0) return { sum: 0, paid: 0, due: 0 };
-        if (btn && btn.classList.contains("paid")) return { sum: v, paid: v, due: 0 };
-        return { sum: v, paid: 0, due: v };
-      }
-
-      // Итог строки и сводка пересчитываются сразу.
       function recalc() {
-        var adv = 0, inv = 0, paid = 0, due = 0;
+        var paid = 0, due = 0;
         qa("tbody tr", table).forEach(function (tr) {
-          var rowSum = 0;
-          qa(".cell", tr).forEach(function (cell, i) {
-            var input = q("input.num", cell);
-            if (!input) return;
-            var c = contribution(input, q(".st", cell));
-            rowSum += c.sum;
-            paid += c.paid;
-            due += c.due;
-            if (i === 0) adv += c.sum; else inv += c.sum;
+          var sum = 0;
+          cells(tr).forEach(function (td) {
+            var input = q("input.num", td);
+            var v = input ? amount(input.value) : 0;
+            sum += v;
+            if (q(".st.paid", td)) { paid += v; } else { due += v; }
           });
-          var out = q("td[data-total]", tr);
-          if (out) out.textContent = totalText(rowSum);
+          var out = q("td.total", tr);
+          if (out) out.textContent = dash(sum);
         });
-        if (foot) {
-          var tds = qa("td", foot);
-          if (tds[1] && q(".num-total", tds[1])) q(".num-total", tds[1]).textContent = money(adv);
-          if (tds[2] && q(".num-total", tds[2])) q(".num-total", tds[2]).textContent = money(inv);
-          if (tds[3]) tds[3].textContent = totalText(adv + inv);
-        }
         if (paidOut) paidOut.textContent = money(paid);
         if (dueOut) dueOut.textContent = money(due);
       }
 
-      function paint(cell) {
-        var btn = q(".st", cell);
-        var input = q("input.num", cell);
+      function paint(td) {
+        var btn = q(".st", td), input = q("input.num", td);
         if (!btn || !input) return;
         var v = amount(input.value);
         var paid = v > 0 && btn.classList.contains("paid");
-        var state = paid ? ["paid", "Оплачен"] : (v === 0 ? ["empty", "Не задан"] : ["due", "Не оплачен"]);
+        var state = paid ? "paid" : (v === 0 ? "empty" : "due");
+        var label = paid ? "Оплачен" : (v === 0 ? "Не задан" : "Не оплачен");
         btn.classList.remove("paid", "due", "empty");
-        btn.classList.add(state[0]);
-        btn.textContent = state[1];
+        btn.classList.add(state);
         btn.setAttribute("aria-pressed", paid ? "true" : "false");
+        btn.setAttribute("title", label);
+        var sr = q(".sr-only", btn);
+        if (sr) sr.textContent = label;
+        td.classList.toggle("is-unpaid", v > 0 && !paid);
+        td.classList.toggle("is-paid", paid);
         input.disabled = paid;
       }
 
-      function save(input) {
-        var cell = input.closest(".cell");
+      function save(input, field, value) {
         var url = "/o/" + encodeURIComponent(objectID) + "/money?m=" +
           encodeURIComponent(input.getAttribute("data-p"));
-        var body = "field=" + encodeURIComponent(input.getAttribute("data-f")) +
-          "&value=" + encodeURIComponent(input.value.trim()) +
-          "&paid=" + (q(".st.paid", cell) ? "1" : "") +
-          "&account=";
-        enqueue(function () {
-          return fetch(url, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-              "Accept": "application/json"
-            },
-            credentials: "same-origin",
-            body: body
-          }).then(function (resp) {
-            return resp.json().catch(function () { return {}; }).then(function (data) {
-              if (!resp.ok) throw new Error(data.error || "ошибка сохранения");
-              markSaved();
-              return data;
-            });
+        var body = "account=" + encodeURIComponent(input.getAttribute("data-account")) +
+          "&field=" + field + "&value=" + encodeURIComponent(value);
+        setStatus("Сохранение…", "saving");
+        track(fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+            "Accept": "application/json"
+          },
+          credentials: "same-origin",
+          body: body
+        })).then(function (resp) {
+          return resp.json().catch(function () { return {}; }).then(function (data) {
+            if (!resp.ok) throw new Error(data.error || "ошибка сохранения");
+            var d = new Date();
+            var hh = String(d.getHours()).padStart(2, "0");
+            var mm = String(d.getMinutes()).padStart(2, "0");
+            setStatus("Сохранено " + hh + ":" + mm, "ok");
           });
+        }).catch(function (err) {
+          setStatus("Не сохранено: " + ((err && err.message) || "ошибка"), "error");
         });
       }
 
-      if (!editable) return;
-
-      var timers = {};
-      function keyOf(input) {
-        return input.getAttribute("data-p") + "|" + input.getAttribute("data-f");
+      function keyOf(el) {
+        return el.getAttribute("data-p") + "|" + el.getAttribute("data-account") +
+          "|" + el.getAttribute("data-field");
       }
 
+      // Отметка оплаты: клик по точке.
       table.addEventListener("click", function (e) {
-        var btn = e.target.closest ? e.target.closest(".st") : null;
+        var btn = e.target.closest ? e.target.closest("button.st") : null;
         if (!btn || !table.contains(btn)) return;
-        var cell = btn.closest(".cell");
-        var input = q("input.num", cell);
-        if (!input) return;
-        if (amount(input.value) === 0) return; // оплачивать нечего
+        var td = btn.closest(".money-cell");
+        var input = q("input.num", td);
+        if (!input || amount(input.value) === 0) return;
         btn.classList.toggle("paid");
-        paint(cell);
+        paint(td);
         recalc();
-        save(input);
+        var field = input.getAttribute("data-field") === "advance" ? "advance_paid" : "paid";
+        save(input, field, btn.classList.contains("paid") ? "1" : "");
       });
 
       table.addEventListener("input", function (e) {
         var input = e.target;
         if (!input.classList || !input.classList.contains("num")) return;
-        paint(input.closest(".cell"));
+        var td = input.closest(".money-cell");
+        paint(td);
         recalc();
         var key = keyOf(input);
         clearTimeout(timers[key]);
         timers[key] = setTimeout(function () {
           delete timers[key];
-          save(input);
+          save(input, input.getAttribute("data-field"), input.value.trim());
         }, 600);
       });
 
@@ -876,9 +798,9 @@
         var key = keyOf(input);
         clearTimeout(timers[key]);
         delete timers[key];
-        paint(input.closest(".cell"));
+        paint(input.closest(".money-cell"));
         recalc();
-        save(input);
+        save(input, input.getAttribute("data-field"), input.value.trim());
       });
     });
   })();

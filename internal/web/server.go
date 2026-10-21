@@ -65,6 +65,7 @@ func New(st *store.Store, loc *time.Location, version string, font []byte, backu
 			"templates/layout.html",
 			"templates/partials.html",
 			"templates/document.html",
+			"templates/moneygrid.html",
 			"templates/meter_fields.html",
 			"templates/"+name+".html",
 		)

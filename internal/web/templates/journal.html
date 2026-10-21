@@ -86,22 +86,22 @@
 </section>
 {{end}}
 
-{{/* Начисления — та же таблица, что на странице начислений, но по выбранному
-     периоду журнала: суммы и отметки об оплате правятся прямо здесь. */}}
-<section class="panel money-table-panel" data-pay-table data-object="{{.Object.ID}}">
+{{/* Начисления: колонки «Аванс» и «Счёт» делятся по счетам (ХВС, ГВС,
+     электро). Всё правится прямо здесь — суммы и отметки оплаты. */}}
+<section class="panel money-table-panel" data-pay-panel data-object="{{.Object.ID}}">
   <div class="section-head">
-    <h2>Начисления за {{.MoneyRange.RangeLabel}} <span class="jcount">· {{.MoneyRange.AccountLbl}}</span></h2>
+    <h2>Начисления за {{.MoneyGrid.RangeLabel}}</h2>
     <div class="section-head-side">
-      {{template "paysummary" .MoneyRange.Totals}}
-      <a class="btn btn-ghost btn-sm" href="{{.MoneyRange.StatementHref}}">{{template "icon-print"}} Печать/отправить</a>
+      <div class="sum">
+        <span class="p">Оплачено: <b data-pay-paid>{{.MoneyGrid.PaidText}}</b></span>
+        <span class="d">К оплате: <b data-pay-due>{{.MoneyGrid.DueText}}</b></span>
+      </div>
+      <a class="btn btn-ghost btn-sm" href="{{.MoneyGrid.StatementHref}}">{{template "icon-print"}} Печать/отправить</a>
     </div>
   </div>
-  {{template "paytable" (paytable .MoneyRange)}}
-  {{if not .MoneyAny}}
-  <p class="hint">Авансы и счета пока не заполнены — впишите суммы на <a href="/?object={{.Object.ID}}">главной</a>.</p>
-  {{else}}
-  <p class="hint">Суммы по счетам, выбранным в фильтре. Изменить аванс, счёт или отметку оплаты можно <a href="/?object={{.Object.ID}}">на главной</a> — там каждый счёт отдельно.</p>
-  {{end}}
+  {{template "moneygrid" .MoneyGrid}}
+  <p class="hint jscroll-hint">На телефоне таблицу можно прокручивать вбок.</p>
+  <p class="hint">Суммы и отметки оплаты сохраняются сами. Цвет колонки — счёт: ХВС, ГВС или электро. Неоплаченное подсвечено.</p>
 </section>
 {{end}}
 {{end}}

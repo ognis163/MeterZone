@@ -121,14 +121,14 @@ func (s *Server) handlePatchMoney(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	_ = obj
 	field := strings.TrimSpace(r.PostFormValue("field"))
+	raw := strings.TrimSpace(r.PostFormValue("value"))
+
 	acc := model.Account(strings.TrimSpace(r.PostFormValue("account")))
 	if !model.ValidAccount(string(acc)) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "неизвестный счёт"})
 		return
 	}
-	raw := strings.TrimSpace(r.PostFormValue("value"))
 
 	var apply func(*model.Money)
 	switch field {

@@ -144,61 +144,9 @@
 
 {{/* ---------- таблица «Авансы и счета» ---------- */}}
 
-{{define "paysummary"}}
-<div class="sum" data-pay-sum>
-  <span class="p">Оплачено: <b data-pay-paid>{{.PaidText}}</b></span>
-  <span class="d">К оплате: <b data-pay-due>{{.DueText}}</b></span>
-</div>
-{{end}}
 
-{{define "paytotal"}}
-<div class="cell"><span class="num-total">{{.SumText}}</span></div>
-{{end}}
 
-{{define "paytable"}}
-<div class="tbl sw" data-pay-scroll>
-  <table class="pay" data-pay-edit="{{if .Editable}}1{{else}}0{{end}}">
-    <thead>
-      <tr>
-        <th class="mc">Месяц</th>
-        <th>Аванс</th>
-        <th>Счёт</th>
-        <th class="mr">Итого</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{range .Rows}}
-      <tr data-row='{{.Period}}'{{if .IsCurrent}} class="cur"{{end}}>
-        <td class="m mc">{{.Label}}</td>
-        <td>{{template "paycell" .Advance}}</td>
-        <td>{{template "paycell" .Invoice}}</td>
-        <td class="r mr" data-total>{{.TotalText}}</td>
-      </tr>
-      {{end}}
-    </tbody>
-    <tfoot>
-      <tr data-total-row>
-        <td class="m mc">Итого</td>
-        <td>{{template "paytotal" .Totals.Advance}}</td>
-        <td>{{template "paytotal" .Totals.Invoice}}</td>
-        <td class="r mr">{{.Totals.TotalText}}</td>
-      </tr>
-    </tfoot>
-  </table>
-</div>
-{{end}}
 
-{{define "paycell"}}
-<div class="cell">
-  <input class="num" type="number" min="0" inputmode="decimal" value="{{.SumValue}}"
-         aria-label="Сумма"{{if or .Paid .Locked}} disabled{{end}}
-         data-p='{{.Period}}' data-f="{{.Field}}"{{if not .HasSum}} data-empty="1"{{end}}>
-  <button class="st {{.Status}}" type="button"
-          data-p='{{.Period}}' data-f="{{.Field}}" data-paid="{{if .Paid}}1{{end}}"
-          aria-pressed="{{if .Paid}}true{{else}}false{{end}}"
-          title="Отметить оплату">{{.StatusRu}}</button>
-</div>
-{{end}}
 
 {{/* ---------- таблица «Итоги»: та же сетка, что у начислений ---------- */}}
 

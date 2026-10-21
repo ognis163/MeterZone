@@ -123,10 +123,14 @@ func TestJournalMoneyRespectsScope(t *testing.T) {
 		}
 	}
 
-	cases := map[string]string{
-		"all":    "4 500 ₽",
-		"water":  "1 500 ₽",
-		"energy": "3 000 ₽",
+	// scope → ожидаемый итог строки и число ячеек счетов в строке.
+	cases := map[string]struct {
+		total string
+		cells int
+	}{
+		"all":    {"4 500 ₽", 6}, // ХВС, ГВС, электро — аванс и счёт
+		"water":  {"1 500 ₽", 4}, // ХВС и ГВС
+		"energy": {"3 000 ₽", 2}, // только электро
 	}
 	for scope, want := range cases {
 		rr := request(t, h, http.MethodGet,
@@ -135,8 +139,13 @@ func TestJournalMoneyRespectsScope(t *testing.T) {
 			t.Fatalf("%s: код %d", scope, rr.Code)
 		}
 		body := rr.Body.String()
-		if !strings.Contains(body, "data-total>"+want) {
-			t.Fatalf("%s: нет итога %q в строке месяца", scope, want)
+		if !strings.Contains(body, `class="r mr total">`+want.total) {
+			t.Fatalf("%s: нет итога %q в строке месяца", scope, want.total)
+		}
+		row := body[strings.Index(body, `data-row="2026-10"`):]
+		row = row[:strings.Index(row, "</tr>")]
+		if got := strings.Count(row, `class="money-cell`); got != want.cells {
+			t.Fatalf("%s: ячеек счетов %d, ожидалось %d", scope, got, want.cells)
 		}
 	}
 }

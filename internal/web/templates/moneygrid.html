@@ -1,0 +1,52 @@
+{{/* ---------- начисления журнала: по колонке на каждый счёт ---------- */}}
+
+{{define "moneygridcell"}}
+<td class="money-cell tone-{{.Tone}}{{if .Unpaid}} is-unpaid{{end}}{{if .Paid}} is-paid{{end}}"
+    data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}">
+  <input class="num" type="text" inputmode="decimal" autocomplete="off" value="{{.Value}}"
+         aria-label="Сумма"{{if .Paid}} disabled{{end}}
+         data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}">
+  <button class="st {{.Status}}" type="button" data-toggle
+          data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}"
+          aria-pressed="{{if .Paid}}true{{else}}false{{end}}" title="{{.StatusRu}}">
+    <span class="sr-only">{{.StatusRu}}</span>
+  </button>
+</td>
+{{end}}
+
+{{define "moneygrid"}}
+<div class="tbl sw">
+  <table class="pay grid" data-money-grid data-object="{{.Object.ID}}">
+    <thead>
+      <tr class="pay-groups">
+        <th rowspan="2" class="mc">Месяц</th>
+        {{if .AdvCols}}<th colspan="{{len .AdvCols}}" class="pay-group">Аванс</th>{{end}}
+        {{if .InvCols}}<th colspan="{{len .InvCols}}" class="pay-group">Счёт</th>{{end}}
+        <th rowspan="2" class="mr">Итого</th>
+      </tr>
+      <tr class="pay-sub">
+        {{range .AdvCols}}<th class="tone-{{.Tone}}" title="{{.Label}}">{{.Short}}</th>{{end}}
+        {{range .InvCols}}<th class="tone-{{.Tone}}" title="{{.Label}}">{{.Short}}</th>{{end}}
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Rows}}
+      <tr data-row="{{.Period}}"{{if .Current}} class="cur"{{end}}>
+        <td class="m mc">{{.Label}}</td>
+        {{range .Advance}}{{template "moneygridcell" .}}{{end}}
+        {{range .Invoice}}{{template "moneygridcell" .}}{{end}}
+        <td class="r mr total">{{.TotalText}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td class="m mc">Итого</td>
+        {{range .AdvTotals}}<td class="r money-total">{{.}}</td>{{end}}
+        {{range .InvTotals}}<td class="r money-total">{{.}}</td>{{end}}
+        <td class="r mr total">{{.TotalText}}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+{{end}}

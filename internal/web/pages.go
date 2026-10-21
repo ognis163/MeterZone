@@ -786,7 +786,7 @@ type journalPageData struct {
 	HasYear       bool
 	Resources     []model.Resource
 	JournalTable   journalTableData
-	MoneyRange     moneyYearData
+	MoneyGrid      moneyGrid
 	MoneyAny       bool
 	MoneyFromLabel string
 	MoneyToLabel   string
@@ -994,16 +994,12 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 	data.MonthsCount = monthsCount
 	data.HasMonths = monthsCount > 0
 
-	// «Итоги» — та же сетка, что у начислений: месяц и колонки по ресурсам.
-	// выбранному периоду журнала: строка на каждый месяц диапазона.
-	// Здесь же можно менять суммы и отметки оплаты.
-	data.MoneyRange = s.buildMoneyRange(obj, from, to, today, scope, false)
-	// Ведомость начислений открывается той же страницей документа, что и остальные.
-	data.MoneyRange.StatementHref = reportPreviewHref(obj.ID, "charges", scope, to, from, to)
-
-	data.MoneyAny = data.MoneyRange.HasAny
-	data.MoneyFromLabel = data.MoneyRange.FromLabel
-	data.MoneyToLabel = data.MoneyRange.ToLabel
+	// Начисления — таблица по каждому счёту: колонки «Аванс» и «Счёт»
+	// делятся на ХВС, ГВС и электро, если они включены в настройках прибора.
+	// Суммы и отметки оплаты правятся прямо здесь.
+	data.MoneyGrid = s.buildMoneyGrid(obj, from, to, today, scope, true,
+		reportPreviewHref(obj.ID, "charges", scope, to, from, to))
+	data.MoneyAny = data.MoneyGrid.HasAny
 	// Ссылки внутри журнала сохраняют объект, диапазон и фильтр.
 	hrefFor := func(f, t model.Period, sc string) string {
 		q := url.Values{}
