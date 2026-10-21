@@ -9,269 +9,42 @@ import (
 	"strings"
 	"time"
 
+	"indextro/internal/docgen"
 	"indextro/internal/mail"
 	"indextro/internal/model"
-	"indextro/internal/pdfdoc"
 	"indextro/internal/report"
 )
 
-type reportRowView struct {
-	Label string
-	Value string
-	Unit  string
-	Note  string
-}
-
-type reportFormData struct {
-	Base
-	Objects  []model.Object
-	ObjectID int64
-	Object   model.Object
-	Kind     string
-	Month    model.Period
-	From     model.Period
-	To       model.Period
-	Months   []model.Period
-	Scope    string
-	HasData  bool
-	Strip    monthStripView
-
-	HasPreview  bool
-	PeriodText  string
-	MeterCount  int
-	MonthsCount int
-	WaterTotal  float64
-	EnergyTotal float64
-	PreviewRows []reportRowView
-
-	OpenHref  string
-	PDFHref   string
-	PrintHref string
-
-	EmailWater  string
-	EmailEnergy string
-	EmailTo     string
-	SelfEmail   string
-	SMTPReady   bool
-}
-
+// handleReportsForm перенаправляет старые ссылки на объединённый журнал.
 func (s *Server) handleReportsForm(w http.ResponseWriter, r *http.Request) {
-	objects, err := s.Store.Objects(false)
-	if err != nil {
-		s.fail(w, http.StatusInternalServerError, "Ошибка", "Не удалось прочитать объекты.")
-		return
+	q := r.URL.Query()
+	out := url.Values{}
+	if v := q.Get("object"); v != "" {
+		out.Set("object", v)
 	}
-	now := time.Now().In(s.Loc)
-	current := model.PeriodOf(now)
-	base := s.base("Отчёты", "reports")
-	base.Flash = s.flash(r)
-	base.Error = ""
-	shared := s.periodContext(r)
-	data := reportFormData{
-		Base:    base,
-		Objects: objects,
-		Kind:    "month",
-		Month:   current,
-		From:    model.Period{Year: now.Year(), Month: 1},
-		To:      model.Period{Year: now.Year(), Month: 12},
-		Scope:   scopeValue(r),
+	if v := q.Get("scope"); v == "water" || v == "energy" {
+		out.Set("scope", v)
 	}
-	if len(objects) > 0 {
-		// Объект из адреса, иначе — выбранный ранее в шапке (cookie), иначе первый.
-		data.ObjectID = s.selectedObjectID(r)
-	}
-	if k := r.FormValue("kind"); k == "range" {
-		data.Kind = "range"
-	}
-	if data.ObjectID == 0 {
-		s.render(w, http.StatusOK, "reports", data)
-		return
-	}
-
-	od, err := s.loadObjectData(data.ObjectID)
-	if err != nil {
-		s.fail(w, http.StatusNotFound, "Объект не найден", "Возможно, он был удалён.")
-		return
-	}
-	data.Object = od.Object
-	s.withObjectContext(w, r, &data.Base, data.ObjectID, "/reports")
-
-	months, err := s.Store.AvailableMonths(data.ObjectID)
-	if err == nil {
-		data.Months = months
-	}
-	if len(months) > 0 {
-		data.HasData = true
-		first, last := months[0], months[len(months)-1]
-		// Месяц общий для всех страниц: выбранный на главной или в журнале.
-		data.Month = shared
-		if !containsPeriod(months, shared) {
-			data.Month = last
+	if q.Get("kind") == "range" {
+		if v := q.Get("from"); v != "" {
+			out.Set("from", v)
 		}
-		rememberPeriod(w, data.Month)
-		data.From = first
-		data.To = last
-		if v := r.FormValue("m_mobile"); v != "" {
-			if p, err := model.ParsePeriod(v); err == nil && containsPeriod(months, p) {
-				data.Month = p
-			}
-		} else if v := r.FormValue("m"); v != "" {
-			if p, err := model.ParsePeriod(v); err == nil && containsPeriod(months, p) {
-				data.Month = p
-			}
+		if v := q.Get("to"); v != "" {
+			out.Set("to", v)
 		}
-		if v := r.FormValue("from"); v != "" {
-			if p, err := model.ParsePeriod(v); err == nil && containsPeriod(months, p) {
-				data.From = p
-			}
-		}
-		if v := r.FormValue("to"); v != "" {
-			if p, err := model.ParsePeriod(v); err == nil && containsPeriod(months, p) {
-				data.To = p
-			}
-		}
-		if data.To.Before(data.From) {
-			data.From, data.To = data.To, data.From
-		}
+	} else if v := q.Get("m"); v != "" {
+		out.Set("from", v)
+		out.Set("to", v)
 	}
-
-	href := func(p model.Period) string {
-		q := url.Values{}
-		q.Set("object", strconv.FormatInt(data.ObjectID, 10))
-		q.Set("kind", "month")
-		q.Set("scope", data.Scope)
-		q.Set("m", p.String())
-		return "/reports?" + q.Encode()
-	}
-	data.Strip = buildMonthStrip(data.Month, monthsMap(months), href, true, current)
-	if data.HasData {
-		if p, ok := nearestMonthInYear(months, data.Month.Year-1, data.Month.Month); ok {
-			data.Strip.PrevHref = href(p)
-		} else {
-			data.Strip.PrevHref = ""
-		}
-		if p, ok := nearestMonthInYear(months, data.Month.Year+1, data.Month.Month); ok {
-			data.Strip.NextHref = href(p)
-		} else {
-			data.Strip.NextHref = ""
-		}
-	}
-
-	// Мини-предпросмотр выбранного месяца или периода.
-	if data.HasData {
-		if data.Kind == "month" {
-			rep := report.MonthReport(od, data.Month, data.Scope, now)
-			data.PeriodText = data.Month.Label()
-			data.MeterCount = rep.Total
-			data.HasPreview = rep.HasReadings
-			for _, sec := range rep.Sections {
-				switch sec.Resource {
-				case model.WaterCold, model.WaterHot:
-					data.WaterTotal = model.Round3(data.WaterTotal + sec.Total)
-				case model.Energy:
-					data.EnergyTotal = model.Round3(data.EnergyTotal + sec.Total)
-				}
-				data.PreviewRows = append(data.PreviewRows, reportRowView{
-					Label: sec.Title,
-					Value: model.FormatValue(sec.Total),
-					Unit:  sec.Unit,
-				})
-			}
-			if rep.HasReadings {
-				q := url.Values{}
-				q.Set("object", strconv.FormatInt(data.ObjectID, 10))
-				q.Set("kind", "month")
-				q.Set("scope", data.Scope)
-				q.Set("m", data.Month.String())
-				data.OpenHref = "/reports/preview?" + q.Encode()
-				data.PDFHref = "/pdf?" + q.Encode()
-				data.PrintHref = data.OpenHref + "&print=1"
-			}
-		} else {
-			rrep := report.RangeReport(od, data.From, data.To, data.Scope, now)
-			data.PeriodText = data.From.Label() + " — " + data.To.Label()
-			data.MeterCount = len(rrep.MeterTotals)
-			data.MonthsCount = data.From.MonthDiff(data.To) + 1
-			data.HasPreview = rrep.HasData
-			for _, rsc := range rrep.Resources {
-				total := rrep.ResourceTotals[rsc]
-				data.PreviewRows = append(data.PreviewRows, reportRowView{
-					Label: rsc.Section(),
-					Value: model.FormatValue(total),
-					Unit:  rsc.Unit(),
-					Note:  "за период",
-				})
-				switch rsc {
-				case model.WaterCold, model.WaterHot:
-					data.WaterTotal = model.Round3(data.WaterTotal + total)
-				case model.Energy:
-					data.EnergyTotal = model.Round3(data.EnergyTotal + total)
-				}
-			}
-			q := url.Values{}
-			q.Set("object", strconv.FormatInt(data.ObjectID, 10))
-			q.Set("kind", "range")
-			q.Set("scope", data.Scope)
-			q.Set("from", data.From.String())
-			q.Set("to", data.To.String())
-			data.OpenHref = "/reports/preview?" + q.Encode()
-			data.PDFHref = "/pdf?" + q.Encode()
-			data.PrintHref = data.OpenHref + "&print=1"
-		}
-	}
-
-	data.EmailWater = od.Object.EmailWater
-	data.EmailEnergy = od.Object.EmailEnergy
-	data.EmailTo = reportEmail(od.Object, data.Scope)
-	cfg := s.loadSMTP()
-	data.SelfEmail = cfg.From
-	if data.SelfEmail == "" && validEmail(cfg.User) {
-		data.SelfEmail = cfg.User
-	}
-	data.SMTPReady = cfg.config().Validate() == nil
-
-	s.render(w, http.StatusOK, "reports", data)
-}
-
-// nearestMonthInYear выбирает месяц указанного года, ближайший к prefer.
-func nearestMonthInYear(months []model.Period, year, prefer int) (model.Period, bool) {
-	var best model.Period
-	bestDiff := 99
-	for _, p := range months {
-		if p.Year != year {
-			continue
-		}
-		d := p.Month - prefer
-		if d < 0 {
-			d = -d
-		}
-		if d < bestDiff {
-			best, bestDiff = p, d
-		}
-	}
-	return best, bestDiff != 99
-}
-
-func containsPeriod(list []model.Period, p model.Period) bool {
-	for _, v := range list {
-		if v == p {
-			return true
-		}
-	}
-	return false
+	http.Redirect(w, r, "/journal?"+out.Encode(), http.StatusFound)
 }
 
 type previewPageData struct {
 	Base
-	Kind       string
-	Month      report.Month
-	Range      report.Range
-	Object     model.Object
-	Scope      string
-	ScopeText  string
-	PDFHref    string
-	BackHref   string
-	PeriodText string
+	Doc      docgen.Document
+	PDFHref   string
+	BackHref  string
+	BackLabel string
 
 	ObjectField string
 	KindField   string
@@ -287,14 +60,12 @@ type previewPageData struct {
 	SMTPReady   bool
 }
 
-func scopeText(scope string) string {
-	switch scope {
-	case "water":
-		return "Вода"
-	case "energy":
-		return "Электроэнергия"
+// buildDocument собирает печатный документ из готового отчёта.
+func buildDocument(kind string, month report.Month, rng report.Range) docgen.Document {
+	if kind == "month" {
+		return docgen.Month(month)
 	}
-	return "Всё"
+	return docgen.Range(rng)
 }
 
 func scopeValue(r *http.Request) string {
@@ -361,64 +132,135 @@ func (s *Server) reportDoc(r *http.Request) (kind string, monthRep report.Month,
 	return
 }
 
-func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
-	kind, monthRep, rangeRep, obj, scope, from, to, month, err := s.reportDoc(r)
-	if err != nil {
-		s.fail(w, http.StatusBadRequest, "Не удалось построить отчёт", err.Error())
-		return
-	}
-	base := s.base("Предпросмотр", "reports")
-	base.Flash = s.flash(r)
-	if r.URL.Query().Get("err") == "send" {
-		base.Error = "Не удалось отправить письмо. Проверьте настройки почты и адрес получателя."
-	}
-	cfg := s.loadSMTP()
-	data := previewPageData{
-		Base:        base,
-		Kind:        kind,
-		Month:       monthRep,
-		Range:       rangeRep,
-		Object:      obj,
-		Scope:       scope,
-		ScopeText:   scopeText(scope),
-		ObjectField: strconv.FormatInt(obj.ID, 10),
-		KindField:   kind,
-		ScopeField:  scope,
-		MField:      month.String(),
-		FromField:   from.String(),
-		ToField:     to.String(),
-		SMTPReady:   cfg.config().Validate() == nil,
-	}
-	data.EmailTo = reportEmail(obj, scope)
-	data.EmailWater = obj.EmailWater
-	data.EmailEnergy = obj.EmailEnergy
-	cfg = s.loadSMTP()
-	data.SelfEmail = cfg.From
-	if data.SelfEmail == "" && validEmail(cfg.User) {
-		data.SelfEmail = cfg.User
-	}
-	data.SMTPReady = cfg.config().Validate() == nil
-	if kind == "month" {
-		data.PeriodText = month.Label()
-	} else {
-		data.PeriodText = from.Label() + " — " + to.Label()
-	}
-	q := url.Values{}
-	q.Set("object", data.ObjectField)
-	q.Set("kind", kind)
-	q.Set("scope", scope)
-	if kind == "month" {
-		q.Set("m", month.String())
-	} else {
-		q.Set("from", from.String())
-		q.Set("to", to.String())
-	}
-	data.PDFHref = "/pdf?" + q.Encode()
-	data.BackHref = "/reports?" + q.Encode()
-	s.withObjectContext(w, r, &data.Base, obj.ID, "/reports")
-	s.render(w, http.StatusOK, "preview", data)
+// docRequest — собранный документ и параметры, нужные ссылкам и письму.
+type docRequest struct {
+	doc   docgen.Document
+	obj   model.Object
+	kind  string
+	scope string
+	month model.Period
+	from  model.Period
+	to    model.Period
 }
 
+// docObject — объект для документа: из адреса, cookie или первый доступный.
+func (s *Server) docObject(r *http.Request) (model.Object, error) {
+	if id := s.selectedObjectID(r); id != 0 {
+		if o, err := s.Store.Object(id); err == nil {
+			return o, nil
+		}
+	}
+	objects, err := s.Store.Objects(false)
+	if err != nil || len(objects) == 0 {
+		return model.Object{}, fmt.Errorf("нет объектов для отчёта")
+	}
+	return objects[0], nil
+}
+
+// buildDocRequest собирает любой документ по параметрам адреса:
+// month — сведения за месяц, range — ведомость показаний,
+// charges — ведомость начислений. Все три открываются одной страницей.
+func (s *Server) buildDocRequest(r *http.Request) (docRequest, error) {
+	kind := strings.TrimSpace(r.FormValue("kind"))
+	scope := scopeValue(r)
+	now := time.Now().In(s.Loc)
+
+	if kind == "charges" {
+		obj, err := s.docObject(r)
+		if err != nil {
+			return docRequest{}, err
+		}
+		from := periodValue(r, "from", model.Period{Year: now.Year(), Month: 1})
+		to := periodValue(r, "to", model.Period{Year: now.Year(), Month: 12})
+		if to.Before(from) {
+			from, to = to, from
+		}
+		if from.MonthDiff(to) > 120 {
+			return docRequest{}, fmt.Errorf("период больше 10 лет")
+		}
+		yd := s.buildMoneyRange(obj, from, to, model.PeriodOf(now), false)
+		return docRequest{
+			doc:   chargesDocument(yd),
+			obj:   obj,
+			kind:  "charges",
+			scope: scope,
+			month: to,
+			from:  from,
+			to:    to,
+		}, nil
+	}
+
+	_, monthRep, rangeRep, obj, docScope, from, to, month, err := s.reportDoc(r)
+	if err != nil {
+		return docRequest{}, err
+	}
+	if kind != "month" && kind != "range" {
+		kind = "month"
+	}
+	return docRequest{
+		doc:   buildDocument(kind, monthRep, rangeRep),
+		obj:   obj,
+		kind:  kind,
+		scope: docScope,
+		month: month,
+		from:  from,
+		to:    to,
+	}, nil
+}
+
+// query — параметры документа для ссылок на PDF и отправку письма.
+func (d docRequest) query() url.Values {
+	q := url.Values{}
+	q.Set("object", strconv.FormatInt(d.obj.ID, 10))
+	q.Set("kind", d.kind)
+	q.Set("scope", d.scope)
+	if d.kind == "month" {
+		q.Set("m", d.month.String())
+		q.Set("from", d.month.String())
+		q.Set("to", d.month.String())
+	} else {
+		q.Set("from", d.from.String())
+		q.Set("to", d.to.String())
+	}
+	return q
+}
+
+// backHref — «Назад» из документа всегда ведёт в журнал за тот же период:
+// документы открывают из журнала и с главной.
+func (d docRequest) backHref() string {
+	q := url.Values{}
+	q.Set("object", strconv.FormatInt(d.obj.ID, 10))
+	if d.kind == "month" {
+		q.Set("from", d.month.String())
+		q.Set("to", d.month.String())
+	} else {
+		q.Set("from", d.from.String())
+		q.Set("to", d.to.String())
+	}
+	return "/journal?" + q.Encode()
+}
+
+// periodLabel — период документа словами.
+func (d docRequest) periodLabel() string {
+	if d.kind == "month" {
+		return d.month.Label()
+	}
+	if d.from == d.to {
+		return d.from.Label()
+	}
+	return d.from.Label() + " — " + d.to.Label()
+}
+
+// fileName — имя файла при скачивании и отправке.
+func (d docRequest) fileName() string {
+	if d.kind == "charges" {
+		name := strings.Join([]string{"Ведомость начислений", objectPlace(d.obj), d.periodLabel()}, " — ")
+		return sanitizeFileName(name) + ".pdf"
+	}
+	return reportFileName(d.kind, d.scope, d.obj, d.month, d.from, d.to)
+}
+
+// reportEmail — адрес получателя для выбранного набора ресурсов.
 func reportEmail(obj model.Object, scope string) string {
 	switch scope {
 	case "water":
@@ -431,18 +273,55 @@ func reportEmail(obj model.Object, scope string) string {
 	}
 	return obj.EmailEnergy
 }
+func (s *Server) handlePreview(w http.ResponseWriter, r *http.Request) {
+	req, err := s.buildDocRequest(r)
+	if err != nil {
+		s.fail(w, http.StatusBadRequest, "Не удалось построить отчёт", err.Error())
+		return
+	}
+	base := s.base("Предпросмотр", "journal")
+	base.Flash = s.flash(r)
+	if r.URL.Query().Get("err") == "send" {
+		base.Error = "Не удалось отправить письмо. Проверьте настройки почты и адрес получателя."
+	}
+	cfg := s.loadSMTP()
+	q := req.query()
+	data := previewPageData{
+		Base:        base,
+		Doc:         req.doc,
+		ObjectField: strconv.FormatInt(req.obj.ID, 10),
+		KindField:   req.kind,
+		ScopeField:  req.scope,
+		MField:      req.month.String(),
+		FromField:   req.from.String(),
+		ToField:     req.to.String(),
+		SMTPReady:   cfg.config().Validate() == nil,
+	}
+	data.EmailTo = reportEmail(req.obj, req.scope)
+	data.EmailWater = req.obj.EmailWater
+	data.EmailEnergy = req.obj.EmailEnergy
+	data.SelfEmail = cfg.From
+	if data.SelfEmail == "" && validEmail(cfg.User) {
+		data.SelfEmail = cfg.User
+	}
+	data.PDFHref = "/pdf?" + q.Encode()
+	data.BackHref = req.backHref()
+	data.BackLabel = "Журнал"
+	s.withObjectContext(w, r, &data.Base, req.obj.ID, "/journal")
+	s.render(w, http.StatusOK, "preview", data)
+}
 
 func (s *Server) handleSendReport(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		s.fail(w, http.StatusBadRequest, "Ошибка", "Не удалось прочитать форму.")
 		return
 	}
-	kind, monthRep, rangeRep, obj, scope, from, to, month, err := s.reportDoc(r)
+	req, err := s.buildDocRequest(r)
 	if err != nil {
 		s.fail(w, http.StatusBadRequest, "Не удалось построить документ", err.Error())
 		return
 	}
-	back := previewHref(obj, kind, scope, month, from, to)
+	back := "/reports/preview?" + req.query().Encode()
 	cfg := s.loadSMTP()
 	if err := cfg.config().Validate(); err != nil {
 		s.redirect(w, r, back+"&err=send")
@@ -453,28 +332,26 @@ func (s *Server) handleSendReport(w http.ResponseWriter, r *http.Request) {
 		s.redirect(w, r, back+"&err=send")
 		return
 	}
-	var data []byte
-	if kind == "month" {
-		data, err = pdfdoc.MonthPDF(monthRep, s.Font)
-	} else {
-		data, err = pdfdoc.RangePDF(rangeRep, s.Font)
-	}
+	pdf, err := docgen.PDF(req.doc, s.Font)
 	if err != nil {
 		s.redirect(w, r, back+"&err=send")
 		return
 	}
-	name := reportFileName(kind, scope, obj, month, from, to)
-	period := month.Label()
-	if kind == "range" {
-		period = from.Label() + " — " + to.Label()
-	}
-	subject := fmt.Sprintf("Показания — %s — %s", obj.Title(), period)
-	if kind == "range" {
-		subject = fmt.Sprintf("Ведомость — %s — %s", obj.Title(), period)
+	name := req.fileName()
+	period := req.periodLabel()
+	subject := fmt.Sprintf("Показания — %s — %s", req.obj.Title(), period)
+	noun := "сведения"
+	switch req.kind {
+	case "range":
+		subject = fmt.Sprintf("Ведомость — %s — %s", req.obj.Title(), period)
+		noun = "ведомость"
+	case "charges":
+		subject = fmt.Sprintf("Ведомость начислений — %s — %s", req.obj.Title(), period)
+		noun = "ведомость начислений"
 	}
 	body := fmt.Sprintf("Здравствуйте!\n\nНаправляю %s по объекту «%s» за %s.\n\nФайл: %s\n\n—\nMeterZone",
-		map[bool]string{true: "ведомость", false: "сведения"}[kind == "range"], obj.Title(), period, name)
-	if err := mail.Send(cfg.config(), toEmail, subject, body, name, data); err != nil {
+		noun, req.obj.Title(), period, name)
+	if err := mail.Send(cfg.config(), toEmail, subject, body, name, pdf); err != nil {
 		log.Printf("отправка письма %s: %v", toEmail, err)
 		s.redirect(w, r, back+"&err=send")
 		return
@@ -482,9 +359,10 @@ func (s *Server) handleSendReport(w http.ResponseWriter, r *http.Request) {
 	s.redirect(w, r, back+"&ok=sent")
 }
 
-func previewHref(obj model.Object, kind, scope string, month, from, to model.Period) string {
+// reportPreviewHref — ссылка на предпросмотр готового документа.
+func reportPreviewHref(id int64, kind, scope string, month, from, to model.Period) string {
 	q := url.Values{}
-	q.Set("object", strconv.FormatInt(obj.ID, 10))
+	q.Set("object", strconv.FormatInt(id, 10))
 	q.Set("kind", kind)
 	q.Set("scope", scope)
 	if kind == "month" {
@@ -497,22 +375,17 @@ func previewHref(obj model.Object, kind, scope string, month, from, to model.Per
 }
 
 func (s *Server) handlePDF(w http.ResponseWriter, r *http.Request) {
-	kind, monthRep, rangeRep, obj, scope, from, to, month, err := s.reportDoc(r)
+	req, err := s.buildDocRequest(r)
 	if err != nil {
 		s.fail(w, http.StatusBadRequest, "Не удалось построить документ", err.Error())
 		return
 	}
-	var data []byte
-	if kind == "month" {
-		data, err = pdfdoc.MonthPDF(monthRep, s.Font)
-	} else {
-		data, err = pdfdoc.RangePDF(rangeRep, s.Font)
-	}
+	data, err := docgen.PDF(req.doc, s.Font)
 	if err != nil {
 		s.fail(w, http.StatusInternalServerError, "Ошибка PDF", "Не удалось сформировать PDF.")
 		return
 	}
-	name := reportFileName(kind, scope, obj, month, from, to)
+	name := req.fileName()
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 	w.Header().Set("Content-Disposition",
@@ -542,10 +415,18 @@ func reportFileName(kind, scope string, obj model.Object, month, from, to model.
 			period = fmt.Sprintf("%s %d – %s %d", from.MonthName(), from.Year, to.MonthName(), to.Year)
 		}
 	}
-	name := strings.Join([]string{prefix, obj.Title(), period}, " — ")
+	name := strings.Join([]string{prefix, objectPlace(obj), period}, " — ")
 	return sanitizeFileName(name) + ".pdf"
 }
 
+// objectPlace — как объект называть в имени файла: адрес, а если его нет,
+// название из карточки объекта.
+func objectPlace(obj model.Object) string {
+	if strings.TrimSpace(obj.Address) != "" {
+		return obj.Address
+	}
+	return obj.Title()
+}
 func sanitizeFileName(s string) string {
 	repl := strings.NewReplacer(
 		"/", "-", "\\", "-", ":", "-", "*", "", "?", "", "\"", "", "<", "", ">", "", "|", "-",

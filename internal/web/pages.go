@@ -3,6 +3,7 @@ package web
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -130,31 +131,6 @@ func moneyRowViewFor(acc model.Account, m model.Money, chargedText, advanceText 
 	}
 }
 
-func moneyRowsFrom(items map[model.Account]model.Money) []moneyRowView {
-	out := make([]moneyRowView, 0, 3)
-	for _, acc := range model.AccountOrder {
-		m := items[acc]
-		row := moneyRowViewFor(acc, m, "", "")
-		// В журнале итоги считаем как остаток: начислено минус оплачено.
-		debt := model.Round2(m.Charged - m.Paid)
-		if debt < 0 {
-			debt = 0
-		}
-		row.Debt = debt
-		row.DebtText = model.FormatMoney(debt)
-		switch {
-		case m.Charged > 0 && m.Paid >= m.Charged:
-			row.StatusText = "Счёт оплачен"
-		case debt > 0:
-			row.StatusText = "Долг " + model.FormatMoney(debt)
-		default:
-			row.StatusText = "Не оплачено"
-		}
-		out = append(out, row)
-	}
-	return out
-}
-
 func moneyRowsWithInput(charged, advance map[model.Account]string,
 	paidFlags, advancePaidFlags map[model.Account]bool,
 	storeMap map[model.Account]model.Money) []moneyRowView {
@@ -198,6 +174,61 @@ func moneyRowsWithInput(charged, advance map[model.Account]string,
 		out = append(out, moneyRowViewFor(acc, m, cText, aText))
 	}
 	return out
+}
+
+// ---------------------------------------------------------------- строки начислений
+
+// journalMoneyAccount — лицевой счёт, в котором журнал ведёт авансы и счета.
+// Сначала берём счета, у которых включён финучёт по приборам, иначе первое
+// хранилище начислений объекта, иначе холодную воду — чтобы у нового объекта
+// ввод в журнале сохранялся, а не уходил в никуда.
+func (s *Server) journalMoneyAccount(objectID int64, period model.Period) model.Account {
+	if meters, err := s.Store.Meters(objectID, true); err == nil {
+		for _, acc := range model.AccountOrder {
+			for _, m := range meters {
+				if m.FinanceModeValue() == model.FinanceNone {
+					continue
+				}
+				switch acc {
+				case model.AccountWaterCold:
+					if m.Resource == model.WaterCold {
+						return acc
+					}
+				case model.AccountWaterHot:
+					if m.Resource == model.WaterHot {
+						return acc
+					}
+				case model.AccountEnergy:
+					if m.Resource == model.Energy {
+						return acc
+					}
+				}
+			}
+		}
+	}
+	if all, err := s.Store.MoneyForMonth(objectID, period.String()); err == nil {
+		for _, acc := range model.AccountOrder {
+			if _, ok := all[acc]; ok {
+				return acc
+			}
+			if acc == model.AccountWaterCold {
+				if _, ok := all[model.AccountWater]; ok {
+					return model.AccountWater
+				}
+			}
+		}
+	}
+	return model.AccountWaterCold
+}
+
+func (s *Server) moneyRowForObject(objectID int64, period model.Period) model.Record {
+	all, err := s.Store.MoneyForMonth(objectID, period.String())
+	if err != nil {
+		return model.Record{Period: period.String()}
+	}
+	rec := all[s.journalMoneyAccount(objectID, period)].Record()
+	rec.Period = period.String()
+	return rec
 }
 
 // ---------------------------------------------------------------- главная
@@ -286,11 +317,21 @@ type entryMeterView struct {
 	HasDerived  bool
 }
 
+// entrySectionView — зона одной плитки: вода (ХВС + ГВС) или электроэнергия.
 type entrySectionView struct {
-	Resource model.Resource
-	Title    string
-	Unit     string
-	Meters   []entryMeterView
+	Resource   model.Resource
+	Title      string
+	Unit       string
+	ReportHref string
+	Groups     []entryGroupView
+	Meters     []entryMeterView
+}
+
+// entryGroupView — счётчики одного вида ресурса внутри плитки.
+type entryGroupView struct {
+	Title  string
+	Single bool // единственный вид ресурса в плитке — подпись не нужна
+	Meters []entryMeterView
 }
 
 type entryPageData struct {
@@ -328,6 +369,10 @@ type entryPageData struct {
 	ShowBillHot       bool
 	ShowAdvanceEnergy bool
 	ShowBillEnergy    bool
+
+	// FinanceTable — начисления за выбранный месяц в стиле журнала.
+	FinanceTable []financeRowView
+	MonthLabel   string
 }
 
 func (s *Server) buildEntryData(r *http.Request, obj model.Object, period model.Period,
@@ -350,10 +395,7 @@ func (s *Server) buildEntryData(r *http.Request, obj model.Object, period model.
 	children := map[int64][]int64{}
 	for _, m := range meters {
 		series := readings[m.ID]
-		prev, _, hasPrev := report.PrevReading(series, period)
-		if !hasPrev && m.StartValue > 0 {
-			prev, hasPrev = m.StartValue, true
-		}
+		prev, _, hasPrev := report.PrevReadingBase(m, series, period)
 		val, hasCurr := series[period.String()]
 		currText := ""
 		if hasCurr {
@@ -382,6 +424,10 @@ func (s *Server) buildEntryData(r *http.Request, obj model.Object, period model.
 					if parsed >= prev {
 						v.Diff = model.Round3(parsed - prev)
 						v.HasDiff = true
+					} else if report.MeterResetAllows(m, period) {
+						// Счётчик заменили: отсчёт идёт от начального значения.
+						v.Diff = model.Round3(parsed - m.StartValue)
+						v.HasDiff = v.Diff >= 0
 					} else {
 						v.Invalid = true
 					}
@@ -422,23 +468,40 @@ func (s *Server) buildEntryData(r *http.Request, obj model.Object, period model.
 		}
 	}
 
-	sections := make([]entrySectionView, 0, 3)
-	sectionIdx := map[model.Resource]int{}
+	// Плитки: одна для водоснабжения (ХВС и ГВС) и одна для электроэнергии.
+	sections := make([]entrySectionView, 0, 2)
+	sectionIdx := map[bool]int{}
+	groupIdx := map[model.Resource]int{}
 	filled, total := 0, 0
 	var water, energy float64
 	for _, m := range meters {
 		v := views[m.ID]
-		idx, ok := sectionIdx[m.Resource]
+		isWater := m.Resource.IsWater()
+		idx, ok := sectionIdx[isWater]
 		if !ok {
 			idx = len(sections)
-			sectionIdx[m.Resource] = idx
-			sections = append(sections, entrySectionView{
-				Resource: m.Resource,
-				Title:    m.Resource.Section(),
-				Unit:     m.Resource.Unit(),
-			})
+			sectionIdx[isWater] = idx
+			sec := entrySectionView{Resource: m.Resource, Unit: m.Resource.Unit()}
+			if isWater {
+				sec.Title = "Водоснабжение"
+				sec.ReportHref = reportPreviewHref(obj.ID, "month", "water", period, period, period)
+			} else {
+				sec.Title = m.Resource.Section()
+				sec.ReportHref = reportPreviewHref(obj.ID, "month", "energy", period, period, period)
+			}
+			sections = append(sections, sec)
 		}
+		gi, ok := groupIdx[m.Resource]
+		if !ok || sections[idx].Groups[gi].Title != m.Resource.Section() {
+			gi = len(sections[idx].Groups)
+			groupIdx[m.Resource] = gi
+			sections[idx].Groups = append(sections[idx].Groups, entryGroupView{Title: m.Resource.Section()})
+		}
+		sections[idx].Groups[gi].Meters = append(sections[idx].Groups[gi].Meters, *v)
 		sections[idx].Meters = append(sections[idx].Meters, *v)
+		if len(sections[idx].Groups) == 1 {
+			sections[idx].Groups[0].Single = !isWater
+		}
 		total++
 		if v.HasCurr {
 			filled++
@@ -500,6 +563,10 @@ func (s *Server) buildEntryData(r *http.Request, obj model.Object, period model.
 		}
 	}
 
+	monthRows := make([]financeRowView, 0, len(money))
+	for _, row := range money {
+		monthRows = append(monthRows, financeRowFrom(row))
+	}
 	avail, _ := s.Store.AvailableMonths(obj.ID)
 	nav := buildMonthNav(period, monthsMap(avail), func(p model.Period) string {
 		return fmt.Sprintf("/?object=%d&m=%s", obj.ID, p.String())
@@ -507,6 +574,8 @@ func (s *Server) buildEntryData(r *http.Request, obj model.Object, period model.
 
 	base := s.base(obj.Title(), "home")
 	base.Error = errMsg
+	// Статус автосохранения живёт в шапке, рядом с названием приложения.
+	base.SaveStatus = true
 	return entryPageData{
 		Base:              base,
 		Object:            obj,
@@ -531,6 +600,8 @@ func (s *Server) buildEntryData(r *http.Request, obj model.Object, period model.
 		ShowBillHot:       financeHotBill,
 		ShowAdvanceEnergy: financeEnergyAdvance,
 		ShowBillEnergy:    financeEnergyBill,
+		FinanceTable:      monthRows,
+		MonthLabel:        period.Accusative() + " г.",
 		DebtTotal:         model.Round2(debt),
 		HasDebt:           debt != 0,
 		MonthNav:          nav,
@@ -598,17 +669,15 @@ func (s *Server) handleSaveReadings(w http.ResponseWriter, r *http.Request) {
 			problems = append(problems, fmt.Sprintf("%s: %v", m.Title(), err))
 			continue
 		}
-		prev, _, hasPrev := report.PrevReading(readings[m.ID], period)
-		if !hasPrev && m.StartValue > 0 {
-			prev, hasPrev = m.StartValue, true
-		}
-		if hasPrev && val < prev {
-			problems = append(problems, fmt.Sprintf("%s: показание %s меньше предыдущего %s",
+		prev, _, hasPrev := report.PrevReadingBase(m, readings[m.ID], period)
+		reset := report.MeterResetAllows(m, period)
+		if hasPrev && val < prev && !reset {
+			problems = append(problems, fmt.Sprintf("%s: значение %s меньше предыдущего %s",
 				m.Title(), model.FormatValue(val), model.FormatValue(prev)))
 			continue
 		}
-		if next, _, hasNext := report.NextReading(readings[m.ID], period); hasNext && val > next {
-			problems = append(problems, fmt.Sprintf("%s: показание %s больше следующего %s",
+		if next, _, hasNext := report.NextReading(readings[m.ID], period); hasNext && val > next && !reset {
+			problems = append(problems, fmt.Sprintf("%s: значение %s больше следующего %s",
 				m.Title(), model.FormatValue(val), model.FormatValue(next)))
 			continue
 		}
@@ -735,6 +804,9 @@ type journalRangeView struct {
 	Label  string
 	Href   string
 	Active bool
+	From   model.Period
+	To     model.Period
+	Wide   bool // на телефоне не показываем: не помещается в строку
 }
 
 // journalTotalView — итог по ресурсу за выбранный период.
@@ -753,30 +825,6 @@ type journalRowView struct {
 	IsCurrent bool
 }
 
-type chartBar struct {
-	Period string
-	Label  string
-	Value  float64
-	Has    bool
-	X      float64
-	CX     float64
-	Y      float64
-	H      float64
-	W      float64
-}
-
-type chartView struct {
-	Kind       string
-	Label      string
-	Unit       string
-	Bars       []chartBar
-	Total      float64
-	Max        float64
-	HasData    bool
-	WaterHref  string
-	EnergyHref string
-	IsWater    bool
-}
 
 type journalPageData struct {
 	Base
@@ -790,9 +838,11 @@ type journalPageData struct {
 	HasData       bool
 	HasYear       bool
 	Resources     []model.Resource
-	Chart         chartView
-	Money         []moneyRowView
-	MoneyAny      bool
+	JournalTable   journalTableData
+	MoneyRange     moneyYearData
+	MoneyAny       bool
+	MoneyFromLabel string
+	MoneyToLabel   string
 	MonthNav      monthNavView
 	SelectedMonth string
 	From          model.Period
@@ -806,6 +856,17 @@ type journalPageData struct {
 	BookTotals    []journalTotalView
 	HasMonths     bool
 	MonthsCount   int
+
+	Scope           string
+	ScopeAllHref    string
+	ScopeWaterHref  string
+	ScopeEnergyHref string
+
+	StatementHref string
+
+	// Выгрузка выбранного объекта и периода из журнала.
+	CSVHref    string
+	DocPDFHref string
 }
 
 func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
@@ -814,7 +875,7 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, http.StatusInternalServerError, "Ошибка", "Не удалось прочитать объекты.")
 		return
 	}
-	base := s.base("Журнал", "journal")
+	base := s.base("Журнал и отчёты", "journal")
 	base.Flash = s.flash(r)
 	data := journalPageData{Base: base, Objects: objects}
 	if len(objects) == 0 {
@@ -869,6 +930,7 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 		from, to = to, from
 	}
 	year := to.Year
+	scope := scopeParam(r)
 
 	od, err := s.loadObjectData(obj.ID)
 	if err != nil {
@@ -882,8 +944,10 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 			active = append(active, m)
 			continue
 		}
-		for p := range od.Readings[m.ID] {
-			if strings.HasPrefix(p, strconv.Itoa(year)) {
+		// Архивный прибор попадает в журнал, если у него есть показания
+		// внутри выбранного диапазона.
+		for key := range od.Readings[m.ID] {
+			if p, err := model.ParsePeriod(key); err == nil && !p.Before(from) && !p.After(to) {
 				active = append(active, m)
 				break
 			}
@@ -893,6 +957,9 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 
 	resources := []model.Resource{}
 	for _, rsc := range model.ResourceOrder {
+		if !report.Scoped(rsc, scope) {
+			continue
+		}
 		for _, m := range meters {
 			if m.Resource == rsc && !m.IsSub() {
 				resources = append(resources, rsc)
@@ -935,7 +1002,7 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 						hasReading = true
 					}
 				}
-				if m.IsSub() {
+				if !!m.IsSub() {
 					continue
 				}
 				if v, ok := od.ConsumptionFor(m, p); ok {
@@ -980,21 +1047,29 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 	data.MonthsCount = monthsCount
 	data.HasMonths = monthsCount > 0
 
-	chart := buildChart(od, year, r.URL.Query().Get("chart"), resources)
-	chart.WaterHref = fmt.Sprintf("/journal?object=%d&year=%d&chart=water", obj.ID, year)
-	chart.EnergyHref = fmt.Sprintf("/journal?object=%d&year=%d&chart=energy", obj.ID, year)
+	// «Итоги» — та же сетка, что у начислений: месяц и колонки по ресурсам.
+	// выбранному периоду журнала: строка на каждый месяц диапазона.
+	// Здесь же можно менять суммы и отметки оплаты.
+	data.MoneyRange = s.buildMoneyRange(obj, from, to, today, true)
+	// Ведомость начислений открывается той же страницей документа, что и остальные.
+	data.MoneyRange.StatementHref = reportPreviewHref(obj.ID, "charges", scope, to, from, to)
 
-	var money []moneyRowView
-	var moneyAny bool
-	moneyTotals, _ := s.Store.MoneyTotals(obj.ID, model.Period{Year: year, Month: 1}, model.Period{Year: year, Month: 12})
-	money = moneyRowsFrom(moneyTotals)
-	for _, m := range money {
-		if m.ChargedRaw != 0 || m.AdvanceRaw != 0 || m.PaidRaw != 0 {
-			moneyAny = true
+	data.MoneyAny = data.MoneyRange.HasAny
+	data.MoneyFromLabel = data.MoneyRange.FromLabel
+	data.MoneyToLabel = data.MoneyRange.ToLabel
+	// Ссылки внутри журнала сохраняют объект, диапазон и фильтр.
+	hrefFor := func(f, t model.Period, sc string) string {
+		q := url.Values{}
+		q.Set("object", strconv.FormatInt(obj.ID, 10))
+		q.Set("from", f.String())
+		q.Set("to", t.String())
+		if sc != "all" {
+			q.Set("scope", sc)
 		}
+		return "/journal?" + q.Encode()
 	}
-
-	baseHref := "/journal?object=" + strconv.FormatInt(obj.ID, 10)
+	lastYear := model.Period{Year: today.Year - 1, Month: 1}
+	lastYearEnd := model.Period{Year: today.Year - 1, Month: 12}
 	data.From = from
 	data.To = to
 	data.FromValue = from.String()
@@ -1010,16 +1085,14 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 		data.RangeLabel = from.Label() + " — " + to.Label()
 	}
 	data.Ranges = []journalRangeView{
-		{Label: "Этот год", Href: baseHref + "&from=" + thisYear(today).String() + "&to=" + endYear(today).String()},
-		{Label: "С начала года", Href: baseHref + "&range=ytd"},
-		{Label: "3 месяца", Href: baseHref + "&range=q3"},
-		{Label: "Прошлый год", Href: baseHref + "&range=prev"},
-		{Label: "2 года", Href: baseHref + "&range=2y"},
+		{Label: "Этот месяц", Href: hrefFor(today, today, scope), From: today, To: today},
+		{Label: "Этот год", Href: hrefFor(thisYear(today), endYear(today), scope), From: thisYear(today), To: endYear(today)},
+		{Label: "С начала года", Href: hrefFor(thisYear(today), today, scope), From: thisYear(today), To: today},
+		{Label: "Прошлый год", Href: hrefFor(lastYear, lastYearEnd, scope), From: lastYear, To: lastYearEnd, Wide: true},
+		{Label: "2 года", Href: hrefFor(lastYear, endYear(today), scope), From: lastYear, To: endYear(today), Wide: true},
 	}
 	for i := range data.Ranges {
-		data.Ranges[i].Active = strings.Contains(data.Ranges[i].Href, "from=") &&
-			strings.Contains(data.Ranges[i].Href, "from="+from.String()) &&
-			strings.Contains(data.Ranges[i].Href, "to="+to.String())
+		data.Ranges[i].Active = from == data.Ranges[i].From && to == data.Ranges[i].To
 	}
 	data.Object = obj
 	data.Year = year
@@ -1029,9 +1102,38 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 	data.Resources = resources
 	data.HasData = len(meters) > 0
 	data.HasYear = hasYear
-	data.Chart = chart
-	data.Money = money
-	data.MoneyAny = moneyAny
+	data.Scope = scope
+	data.ScopeAllHref = hrefFor(from, to, "all")
+	data.ScopeWaterHref = hrefFor(from, to, "water")
+	data.ScopeEnergyHref = hrefFor(from, to, "energy")
+
+	// За один месяц печатаем «Сведения о показаниях», за период — ведомость.
+	statementKind := "range"
+	statementLink := reportPreviewHref(obj.ID, statementKind, scope, from, from, to)
+	if from == to {
+		statementKind = "month"
+		statementLink = reportPreviewHref(obj.ID, statementKind, scope, from, from, to)
+	}
+	data.StatementHref = statementLink
+
+	// Выгрузка: CSV — показания за период, PDF — тот же документ, что и
+	// «Печать/отправить» у «Итогов» (за месяц — сведения, за период — ведомость).
+	data.CSVHref = "/export.csv?" + url.Values{
+		"object": {strconv.FormatInt(obj.ID, 10)},
+		"from":   {from.String()},
+		"to":     {to.String()},
+	}.Encode()
+	data.DocPDFHref = "/pdf?" + url.Values{
+		"object": {strconv.FormatInt(obj.ID, 10)},
+		"kind":   {statementKind},
+		"scope":  {scope},
+		"from":   {from.String()},
+		"to":     {to.String()},
+	}.Encode()
+
+	// Таблица «Итоги» ссылается на лист показаний: собираем её после ссылки.
+	data.JournalTable = buildJournalTable(rows, resources, data.Totals,
+		monthsCount, data.RangeLabel, data.StatementHref)
 	selected := today
 	if shared.Year == year {
 		selected = shared
@@ -1039,97 +1141,6 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 	rememberPeriod(w, selected)
 	s.withObjectContext(w, r, &data.Base, obj.ID, "/journal")
 	s.render(w, http.StatusOK, "journal", data)
-}
-
-func buildChart(od report.ObjectData, year int, kind string, resources []model.Resource) chartView {
-	hasWater := false
-	hasEnergy := false
-	for _, r := range resources {
-		if r.IsWater() {
-			hasWater = true
-		} else if r == model.Energy {
-			hasEnergy = true
-		}
-	}
-	if kind != "water" && kind != "energy" {
-		if hasWater {
-			kind = "water"
-		} else {
-			kind = "energy"
-		}
-	}
-	if kind == "water" && !hasWater {
-		kind = "energy"
-	}
-	if kind == "energy" && !hasEnergy {
-		kind = "water"
-	}
-	cv := chartView{Kind: kind, IsWater: kind == "water"}
-	if kind == "water" {
-		cv.Label = "Вода"
-		cv.Unit = "куб.м"
-	} else {
-		cv.Label = "Электроэнергия"
-		cv.Unit = "кВт·ч"
-	}
-
-	values := make([]float64, 12)
-	for i := 0; i < 12; i++ {
-		p, _ := model.NewPeriod(year, i+1)
-		for _, m := range od.Meters {
-			if m.IsSub() {
-				continue
-			}
-			match := (kind == "water" && m.Resource.IsWater()) || (kind == "energy" && m.Resource == model.Energy)
-			if !match {
-				continue
-			}
-			if cons, ok := od.ConsumptionFor(m, p); ok {
-				values[i] = model.Round3(values[i] + cons)
-			}
-		}
-	}
-	max := 0.0
-	for _, v := range values {
-		if v > max {
-			max = v
-		}
-		cv.Total = model.Round3(cv.Total + v)
-	}
-	cv.Max = max
-	cv.HasData = max > 0
-
-	const width = 720.0
-	const height = 190.0
-	const padLeft = 8.0
-	const padRight = 8.0
-	const padTop = 14.0
-	const padBottom = 26.0
-	plotW := width - padLeft - padRight
-	step := plotW / 12
-	barW := step * 0.52
-	for i, v := range values {
-		p, _ := model.NewPeriod(year, i+1)
-		h := 2.0
-		if max > 0 && v > 0 {
-			h = (height - padTop - padBottom) * v / max
-			if h < 2 {
-				h = 2
-			}
-		}
-		cv.Bars = append(cv.Bars, chartBar{
-			Period: p.String(),
-			Label:  p.MonthShort(),
-			Value:  v,
-			Has:    v > 0,
-			X:      padLeft + float64(i)*step + (step-barW)/2,
-			CX:     padLeft + float64(i)*step + step/2,
-			Y:      height - padBottom - h,
-			H:      h,
-			W:      barW,
-		})
-	}
-	return cv
 }
 
 func thisYear(today model.Period) model.Period { return model.Period{Year: today.Year, Month: 1} }

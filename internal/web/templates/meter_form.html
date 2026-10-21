@@ -41,13 +41,14 @@
     <div class="field">
       <label for="serial">Заводской номер</label>
       <input id="serial" type="text" name="serial" value="{{.Meter.Serial}}" maxlength="60" autocomplete="off">
+      <p class="hint">Смена номера — замена счётчика: в этом и следующем месяце можно указать показания меньше предыдущих.</p>
     </div>
 
     <div class="field">
-      <label for="start_value">Начальное показание</label>
+      <label for="start_value">Начальные показания</label>
       <input id="start_value" type="text" name="start_value" value="{{fmtInput .Meter.StartValue}}"
              inputmode="decimal" autocomplete="off" placeholder="0">
-      <p class="hint">От него считается первый расход.</p>
+      <p class="hint">От него считается первый расход. При смене заводского номера в этом же месяце можно указать показания меньше предыдущих.</p>
     </div>
     <div class="field">
       <label for="installed_on">Дата установки</label>
@@ -57,7 +58,7 @@
     </div>
 
     <div class="field span-2">
-      <label for="parent_id">Родительский прибор</label>
+      <label for="parent_id">Дублирующий счётчик</label>
       <select id="parent_id" name="parent_id">
         <option value="0">Нет — самостоятельный прибор</option>
         {{range .ParentOptions}}
@@ -66,7 +67,7 @@
         </option>
         {{end}}
       </select>
-      <p class="hint">Если это дублирующий счётчик, выберите основной прибор того же ресурса: покажем смещение и расчёт показаний для отправки.</p>
+      <p class="hint">Дублирующий счётчик возможен только для электроэнергии: покажем смещение и показания для отправки.</p>
     </div>
 
     <div class="field field-short">
@@ -103,9 +104,9 @@
 {{if not .IsNew}}
 <section class="panel panel-danger">
   <h2 class="h2">Удаление</h2>
-  <p class="hint">Удаление прибора удалит и все его показания. Для замены счётчика лучше поставить его в архив и добавить новый.</p>
+  <p class="hint">Показания прибора сохранятся в объекте за все месяцы. Для нового счётчика достаточно сменить заводской номер — тогда в этом и следующем месяце можно ввести показания меньше предыдущих.</p>
   <form method="post" action="/meters/{{.Meter.ID}}/delete"
-        data-confirm="Удалить прибор и все его показания? Это нельзя отменить.">
+        data-confirm="Удалить прибор? Введённые показания останутся в истории объекта.">
     <button class="btn btn-danger" type="submit">Удалить прибор</button>
   </form>
 </section>

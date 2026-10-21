@@ -4,6 +4,7 @@ go 1.23
 
 require (
 	github.com/go-pdf/fpdf v0.9.0
+	github.com/gpdf-dev/gpdf v1.0.13
 	modernc.org/sqlite v1.34.5
 )
 

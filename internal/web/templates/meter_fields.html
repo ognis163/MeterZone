@@ -23,9 +23,10 @@
   <div class="field">
     <label>Заводской номер</label>
     <input type="text" name="serial" value="{{.Meter.Serial}}" maxlength="60" autocomplete="off">
+    <p class="hint">Смена номера — замена счётчика: в этом и следующем месяце можно указать показания меньше предыдущих.</p>
   </div>
   <div class="field">
-    <label>Начальное показание</label>
+    <label>Начальные показания</label>
     <input type="text" name="start_value" value="{{fmtInput .Meter.StartValue}}"
            inputmode="decimal" autocomplete="off" placeholder="0">
   </div>
@@ -34,6 +35,7 @@
     <input type="text" name="installed_on" value="{{.Meter.InstalledOn}}"
            placeholder="ГГГГ-ММ-ДД" inputmode="numeric" autocomplete="off">
   </div>
+  {{if .Meter.Resource.IsEnergy}}
   <div class="field span-2">
     <label>Дублирующий счётчик</label>
     <select name="parent_id">
@@ -44,8 +46,11 @@
       </option>
       {{end}}
     </select>
-    <p class="hint">Если счётчик дублирует основной, выберите его: посчитаем смещение и покажем показания для отправки.</p>
+    <p class="hint">Если счётчик дублирует основной счётчик электроэнергии, выберите его: посчитаем смещение.</p>
   </div>
+  {{else}}
+  <input type="hidden" name="parent_id" value="0">
+  {{end}}
   <div class="field">
     <label>Финансовый учёт</label>
     <select name="finance_mode">

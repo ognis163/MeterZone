@@ -6,6 +6,10 @@
 meterzone
 indextro2
 
+# Временные файлы сборки и проверок
+.tmp/
+meterzone-*
+
 # Local data
 data/
 run/

@@ -1,0 +1,50 @@
+{{define "page"}}
+<nav class="crumbs" aria-label="Путь">
+  <a href="/objects">Объекты</a>
+  <span aria-hidden="true">/</span>
+  <a href="/objects/{{.Object.ID}}/edit">{{.Object.Title}}</a>
+  <span aria-hidden="true">/</span>
+  <span>Удаление</span>
+</nav>
+
+<section class="page-head">
+  <div>
+    <p class="eyebrow">Удаление объекта</p>
+    <h1>{{.Object.Title}}</h1>
+    <p class="muted">Вместе с объектом удалятся все приборы и показания за всё время. Это нельзя отменить.</p>
+  </div>
+</section>
+
+<div class="narrow-stack">
+  <section class="panel">
+    <div class="section-head">
+      <h2>Что будет удалено</h2>
+    </div>
+    <dl class="summary-list">
+      <div><dt>Приборов учёта</dt><dd>{{.Meters}}</dd></div>
+      <div><dt>Показаний</dt><dd>{{.Readings}}</dd></div>
+      {{if .HasData}}
+      <div><dt>Период</dt><dd>{{.FirstText}} — {{.LastText}}</dd></div>
+      {{end}}
+    </dl>
+    {{if .HasData}}
+    <p class="hint">Перед удалением можно выгрузить показания: файл скачается и после удаления останется у вас.</p>
+    <div class="preview-actions">
+      <a class="btn" href="/objects/{{.Object.ID}}/export?format=csv">{{template "icon-download"}} Выгрузить в Excel</a>
+      <a class="btn" href="/objects/{{.Object.ID}}/export?format=pdf">{{template "icon-download"}} Выгрузить PDF</a>
+    </div>
+    {{end}}
+  </section>
+
+  <section class="panel panel-danger">
+    <h2 class="h2">Удалить объект</h2>
+    <p class="hint">{{if .HasData}}Показания хранились только здесь. Если нужна история — сначала выгрузите файл.{{else}}Удаление необратимо.{{end}}</p>
+    <form method="post" action="/objects/{{.Object.ID}}/delete" class="form-actions"
+          data-confirm="Удалить объект «{{.Object.Title}}» со всеми приборами и показаниями?">
+      <input type="hidden" name="confirmed" value="1">
+      <button class="btn btn-danger" type="submit">Удалить без выгрузки</button>
+      <a class="btn btn-ghost" href="/objects/{{.Object.ID}}/edit">Отмена</a>
+    </form>
+  </section>
+</div>
+{{end}}

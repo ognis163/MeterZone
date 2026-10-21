@@ -322,20 +322,56 @@ func (s *Server) handleSMTPTest(w http.ResponseWriter, r *http.Request) {
 	s.redirect(w, r, "/settings?ok=smtptest")
 }
 
+// periodRangeText — «Октябрь 2026» или «Январь — Декабрь 2026» для имени файла.
+func periodRangeText(from, to string) string {
+	pf, err1 := model.ParsePeriod(from)
+	pt, err2 := model.ParsePeriod(to)
+	if err1 != nil || err2 != nil {
+		return from + " — " + to
+	}
+	if pf == pt {
+		return pf.Label()
+	}
+	return pf.Label() + " — " + pt.Label()
+}
+
+// handleExportCSV выгружает показания в CSV. Журнал передаёт объект и
+// период — тогда в файл попадают только выбранные месяцы; без параметров
+// выгружается всё (ссылка из настроек).
 func (s *Server) handleExportCSV(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.Store.AllReadingsForExport()
+	var objectID int64
+	if v := strings.TrimSpace(r.URL.Query().Get("object")); v != "" {
+		if id, err := strconv.ParseInt(v, 10, 64); err == nil && id > 0 {
+			objectID = id
+		}
+	}
+	from := strings.TrimSpace(r.URL.Query().Get("from"))
+	to := strings.TrimSpace(r.URL.Query().Get("to"))
+
+	rows, err := s.Store.ReadingsExportPeriod(objectID, from, to)
 	if err != nil {
 		s.fail(w, http.StatusInternalServerError, "Ошибка", "Не удалось выгрузить данные.")
 		return
 	}
-	name := "meterzone-показания-" + time.Now().In(s.Loc).Format("2006-01-02") + ".csv"
+
+	name := "Показания — " + time.Now().In(s.Loc).Format("02.01.2006") + ".csv"
+	if objectID != 0 {
+		if obj, err := s.Store.Object(objectID); err == nil {
+			name = "Показания — " + objectPlace(obj)
+			if from != "" && to != "" {
+				name += " — " + periodRangeText(from, to)
+			}
+			name += ".csv"
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-	w.Header().Set("Content-Disposition", "attachment; filename=\"meterzone-readings.csv\"; filename*=UTF-8''"+url.PathEscape(name))
+	w.Header().Set("Content-Disposition", "attachment; filename=\"meterzone-readings.csv\"; filename*=UTF-8'"+url.PathEscape(sanitizeFileName(name)))
 	w.Write([]byte{0xEF, 0xBB, 0xBF})
 	cw := csv.NewWriter(w)
 	cw.Comma = ';'
 	cw.Write([]string{"Объект", "Адрес", "Собственник", "Прибор", "Заводской номер",
-		"Ресурс", "Период", "Показание", "Расход"})
+		"Ресурс", "Период", "Показания", "Расход"})
 	last := map[string]float64{}
 	for _, e := range rows {
 		key := e.Object + "|" + e.Meter + "|" + e.Serial + "|" + e.Resource

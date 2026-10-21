@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"indextro/internal/model"
 )
@@ -27,7 +28,7 @@ func TestFinanceHidesMoneyPanel(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("код %d", rr.Code)
 	}
-	if strings.Contains(rr.Body.String(), "Финансовый учёт") {
+	if strings.Contains(rr.Body.String(), "finance-panel") {
 		t.Fatal("при выключенном финучёте блок денег виден")
 	}
 
@@ -36,7 +37,7 @@ func TestFinanceHidesMoneyPanel(t *testing.T) {
 		t.Fatal(err)
 	}
 	rr = request(t, h, http.MethodGet, "/?object="+itoa(obj.ID)+"&m=2026-10", nil, "")
-	if !strings.Contains(rr.Body.String(), "Финансовый учёт") {
+	if !strings.Contains(rr.Body.String(), "finance-panel") {
 		t.Fatal("при включённом финучёте блока денег нет")
 	}
 }
@@ -64,16 +65,16 @@ func TestPortSetting(t *testing.T) {
 
 func TestReportsPreviewUsesResourceNames(t *testing.T) {
 	_, _, h := newTestServer(t)
-	rr := request(t, h, http.MethodGet, "/reports?object=1", nil, "")
+	now := model.PeriodOf(time.Now())
+	rr := request(t, h, http.MethodGet, "/reports/preview?object=1&kind=range&from="+now.String()+"&to="+now.String()+"&scope=all", nil, "")
 	if rr.Code != http.StatusOK {
 		t.Fatalf("код %d", rr.Code)
 	}
 	body := rr.Body.String()
-	if !strings.Contains(body, "Холодное водоснабжение") {
-		t.Fatal("в предпросмотре нет раздела ХВС")
-	}
-	if !strings.Contains(body, "Горячее водоснабжение") {
-		t.Fatal("в предпросмотре нет раздела ГВС")
+	for _, want := range []string{"Ведомость показаний", "ХВС", "ГВС", "кВт·ч", "Приборы учёта"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("в ведомости нет %q", want)
+		}
 	}
 	if strings.Contains(body, ">Кухня<") {
 		t.Fatal("в предпросмотре остались названия точек установки")
@@ -88,17 +89,20 @@ func TestParseMoneyRejectsNaN(t *testing.T) {
 	}
 }
 
-func TestJournalMoneyRowsDebt(t *testing.T) {
-	rows := moneyRowsFrom(map[model.Account]model.Money{
-		model.AccountWaterCold: {Charged: 1000, Paid: 400},
-	})
-	for _, row := range rows {
-		if row.Account == string(model.AccountWaterCold) {
-			if row.Debt != 600 {
-				t.Fatalf("долг: %v, ожидалось 600", row.Debt)
-			}
-			return
-		}
+// TestRecordTotals проверяет арифметику строки таблицы начислений:
+// оплачено — по отметкам позиций, к оплате — всё остальное.
+func TestRecordTotals(t *testing.T) {
+	rec := model.Record{AdvanceSum: 12000, InvoiceSum: 8500, InvoicePaid: true}
+	if got := rec.Total(); got != 20500 {
+		t.Fatalf("итого: %v, ожидалось 20500", got)
 	}
-	t.Fatal("строка холодной воды не найдена")
+	if got := rec.Paid(); got != 8500 {
+		t.Fatalf("оплачено: %v, ожидалось 8500", got)
+	}
+	if got := rec.Due(); got != 12000 {
+		t.Fatalf("к оплате: %v, ожидалось 12000", got)
+	}
+	if got := (model.Record{AdvanceSum: 1000, AdvancePaid: true}).Due(); got != 0 {
+		t.Fatalf("оплаченный аванс: к оплате %v", got)
+	}
 }

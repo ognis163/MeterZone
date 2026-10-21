@@ -71,7 +71,7 @@ func (s *Server) handleAutoSave(w http.ResponseWriter, r *http.Request) {
 	raw := strings.TrimSpace(r.PostFormValue("value"))
 	if raw == "" {
 		if err := s.Store.DeleteReading(meter.ID, period.String()); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "не удалось удалить показание"})
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "не удалось удалить показания"})
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "diff": nil})
@@ -83,11 +83,8 @@ func (s *Server) handleAutoSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	readings, _ := s.Store.ReadingsForObject(obj.ID)
-	prev, _, hasPrev := report.PrevReading(readings[meter.ID], period)
-	if !hasPrev && meter.StartValue > 0 {
-		prev, hasPrev = meter.StartValue, true
-	}
-	if hasPrev && val < prev {
+	prev, _, hasPrev := report.PrevReadingBase(*meter, readings[meter.ID], period)
+	if hasPrev && val < prev && !report.MeterResetAllows(*meter, period) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{
 			"error": "меньше предыдущего показания " + model.FormatValue(prev),
 		})
@@ -106,24 +103,35 @@ func (s *Server) handleAutoSave(w http.ResponseWriter, r *http.Request) {
 	resp := map[string]any{"ok": true}
 	if hasPrev {
 		resp["diff"] = model.Round3(val - prev)
+		if val < prev && report.MeterResetAllows(*meter, period) && meter.StartValue > 0 {
+			resp["diff"] = model.Round3(val - meter.StartValue)
+		}
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
 
 // handlePatchMoney сохраняет одно поле финансов, не перезаписывая остальные.
-// POST /o/{id}/money  form: account, field (charged|advance|paid), value
+// POST /o/{id}/money  form: account, field (charged|advance|paid|advance_paid|
+// advance_sum|invoice_sum), value
+//
+// advance_sum и invoice_sum — поля таблицы начислений журнала: сумма аванса
+// и сумма счёта независимо от того, какие позиции включены у приборов.
 func (s *Server) handlePatchMoney(w http.ResponseWriter, r *http.Request) {
 	obj, period, ok := s.entryContext(w, r)
 	if !ok {
 		return
 	}
 	_ = obj
+	field := strings.TrimSpace(r.PostFormValue("field"))
+	if field == "advance_sum" || field == "invoice_sum" {
+		s.handleSavePaymentRow(w, r, obj.ID, period, field)
+		return
+	}
 	acc := model.Account(strings.TrimSpace(r.PostFormValue("account")))
 	if !model.ValidAccount(string(acc)) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "неизвестный счёт"})
 		return
 	}
-	field := strings.TrimSpace(r.PostFormValue("field"))
 	raw := strings.TrimSpace(r.PostFormValue("value"))
 
 	var apply func(*model.Money)
@@ -166,6 +174,50 @@ func (s *Server) handlePatchMoney(w http.ResponseWriter, r *http.Request) {
 		"paid":    m.IsPaid(),
 		"debt":    fmt.Sprintf("%.2f", m.Debt()),
 		"status":  moneyStatus(m),
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleSavePaymentRow сохраняет позицию строки таблицы начислений целиком:
+// одна запись money объединяет аванс и счёт за месяц, какие бы позиции
+// ни были включены у приборов.
+//
+// Сумма пишется нулём, если позиция пустая: у объекта мог быть включён
+// аванс по прибору — тогда пустое поле в журнале означает «снято».
+func (s *Server) handleSavePaymentRow(w http.ResponseWriter, r *http.Request,
+	objectID int64, period model.Period, field string) {
+
+	sum, err := parseMoney(r.PostFormValue("value"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	rawPaid := strings.TrimSpace(r.PostFormValue("paid"))
+	paid := rawPaid == "1" || rawPaid == "true" || rawPaid == "on"
+	if sum == 0 {
+		paid = false
+	}
+
+	var patch func(*model.Money)
+	switch field {
+	case "advance_sum":
+		patch = func(m *model.Money) { m.AdvanceSum = sum; m.AdvancePaid = paid }
+	default:
+		patch = func(m *model.Money) { m.Charged = sum; m.PaidFlag = paid }
+	}
+	acc := s.journalMoneyAccount(objectID, period)
+	if err := s.Store.PatchMoney(objectID, period.String(), acc, patch); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "не удалось сохранить"})
+		return
+	}
+
+	rec := s.moneyRowForObject(objectID, period)
+	resp := map[string]any{
+		"ok":     true,
+		"period": period.String(),
+		"total":  model.FormatMoney(rec.Total()),
+		"paid":   model.FormatMoney(rec.Paid()),
+		"due":    model.FormatMoney(rec.Due()),
 	}
 	writeJSON(w, http.StatusOK, resp)
 }

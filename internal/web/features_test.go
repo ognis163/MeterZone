@@ -11,28 +11,6 @@ import (
 	"indextro/internal/model"
 )
 
-func TestReportsOfferOnlyFilledMonths(t *testing.T) {
-	_, _, h := newTestServer(t)
-	rr := request(t, h, http.MethodGet, "/reports?object=1", nil, "")
-	if rr.Code != http.StatusOK {
-		t.Fatalf("код %d", rr.Code)
-	}
-	body := rr.Body.String()
-	if !strings.Contains(body, "month-strip") {
-		t.Fatal("нет полосы месяцев")
-	}
-	if !strings.Contains(body, "report-preview") {
-		t.Fatal("нет мини-предпросмотра")
-	}
-	if strings.Contains(body, "m=2024-01") {
-		t.Fatal("в выбор попал пустой месяц")
-	}
-	now := model.PeriodOf(time.Now())
-	if !strings.Contains(body, "m="+now.String()) {
-		t.Fatal("текущий заполненный месяц отсутствует")
-	}
-}
-
 func TestSaveMoney(t *testing.T) {
 	_, st, h := newTestServer(t)
 	now := model.PeriodOf(time.Now())
@@ -134,11 +112,15 @@ func TestSubMeterBadge(t *testing.T) {
 	if !strings.Contains(body, "дубль") {
 		t.Fatal("нет отметки дублирующего счётчика")
 	}
-	if !strings.Contains(body, "Финансовый учёт") {
+	if !strings.Contains(body, "finance-panel") {
 		t.Fatal("нет блока начислений")
 	}
-	if !strings.Contains(body, "data-autosave-status") {
-		t.Fatal("нет индикатора автосохранения")
+	if !strings.Contains(body, "data-save-status") {
+		t.Fatal("нет индикатора автосохранения в шапке")
+	}
+	// Статус один: в карточках его больше нет.
+	if strings.Contains(body, "data-autosave-status") || strings.Contains(body, "data-finance-status") {
+		t.Fatal("статус автосохранения задвоен")
 	}
 }
 
@@ -249,12 +231,13 @@ func TestSelectedObjectPersistsAcrossPages(t *testing.T) {
 		return rec
 	}
 
-	reports := withCookie("/reports")
-	if reports.Code != http.StatusOK {
-		t.Fatalf("отчёты: код %d", reports.Code)
+	// /reports — старая ссылка: она перенаправляет в журнал с тем же объектом.
+	redirect := withCookie("/reports?object=2")
+	if redirect.Code != http.StatusFound {
+		t.Fatalf("отчёты: код %d", redirect.Code)
 	}
-	if body := reports.Body.String(); !strings.Contains(body, "object=2") || !strings.Contains(body, "is-active") {
-		t.Fatal("в отчётах выбран не тот объект")
+	if loc := redirect.Header().Get("Location"); !strings.Contains(loc, "/journal") {
+		t.Fatalf("старая ссылка ведёт не в журнал: %q", loc)
 	}
 
 	journal := withCookie("/journal")

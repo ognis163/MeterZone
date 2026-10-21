@@ -163,6 +163,12 @@
               </span>
             </span>
             <button class="iconbtn" type="button" data-meter-edit="{{.ID}}" aria-label="Изменить прибор">{{template "icon-pencil"}}</button>
+            <form method="post" action="/meters/{{.ID}}/delete" class="meter-del"
+                  data-confirm="Удалить прибор «{{.Title}}»? Введённые показания останутся в истории объекта.">
+              <button class="iconbtn iconbtn-del" type="submit" aria-label="Удалить прибор" title="Удалить прибор">
+                <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9.5 7V5h5v2M6.5 7l.8 12.1a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9L17.5 7"/><path d="M10 11v6M14 11v6"/></svg>
+              </button>
+            </form>
           </li>
           {{end}}
         </ul>

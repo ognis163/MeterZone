@@ -64,7 +64,7 @@ func TestPagesRender(t *testing.T) {
 		{"/", "Показания"},
 		{"/?object=1", "Холодное водоснабжение"},
 		{"/journal", "Журнал"},
-		{"/reports", "Отчёты"},
+		{"/journal", "Журнал"},
 		{"/objects", "Объекты"},
 		{"/objects/1/edit", "Приборы учёта"},
 		{"/meters/new?object=1", "Новый прибор"},
@@ -232,7 +232,7 @@ func TestCSVExport(t *testing.T) {
 	if len(body) < 3 || body[0] != 0xEF || body[1] != 0xBB || body[2] != 0xBF {
 		t.Fatal("нет BOM для Excel")
 	}
-	if !strings.Contains(string(body), "Показание") {
+	if !strings.Contains(string(body), "Показания") {
 		t.Fatal("нет заголовков CSV")
 	}
 }

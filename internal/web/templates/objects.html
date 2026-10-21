@@ -1,17 +1,17 @@
 {{define "page"}}
 <section class="page-head">
-  <div>
-    <p class="eyebrow">Справочник</p>
+  <p class="eyebrow">Справочник</p>
+  <div class="page-head-row">
     <h1>Объекты</h1>
+    <a class="btn btn-primary" href="/objects/new">{{template "icon-plus"}} Добавить</a>
   </div>
-  <a class="btn btn-primary" href="/objects/new">{{template "icon-plus"}} Добавить</a>
 </section>
 
 {{if .Items}}
 <ul class="object-grid">
   {{range .Items}}
-  <li class="object-card object-manage">
-    <a class="object-main" href="/?object={{.Object.ID}}">
+  <li class="object-card">
+    <a class="object-main" href="/objects/{{.Object.ID}}/edit">
       <div class="object-top">
         <div class="object-title">
           <h2>{{.Object.Title}}</h2>
@@ -27,10 +27,6 @@
         </span>
       </div>
     </a>
-    <div class="object-actions">
-      <a class="btn btn-ghost btn-sm" href="/?object={{.Object.ID}}">Внести</a>
-      <a class="iconbtn" href="/objects/{{.Object.ID}}/edit" aria-label="Изменить {{.Object.Title}}">{{template "icon-pencil"}}</a>
-    </div>
   </li>
   {{end}}
 </ul>
@@ -47,8 +43,8 @@
 <h2 class="h2">Архив</h2>
 <ul class="object-grid">
   {{range .Archived}}
-  <li class="object-card object-manage is-archived">
-    <div class="object-main">
+  <li class="object-card is-archived">
+    <a class="object-main" href="/objects/{{.Object.ID}}/edit" aria-label="Изменить {{.Object.Title}}">
       <div class="object-top">
         <div class="object-title">
           <h2>{{.Object.Title}}</h2>
@@ -56,10 +52,7 @@
         </div>
         <span class="badge">архив</span>
       </div>
-    </div>
-    <div class="object-actions">
-      <a class="iconbtn" href="/objects/{{.Object.ID}}/edit" aria-label="Изменить">{{template "icon-pencil"}}</a>
-    </div>
+    </a>
   </li>
   {{end}}
 </ul>

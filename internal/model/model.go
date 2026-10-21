@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // Object — учитываемое помещение: дом, коммерческий объект и т. п.
 type Object struct {
@@ -63,6 +66,47 @@ type Meter struct {
 	FinanceMode    string  // none, advance, bill, both
 	Archived       bool
 	Sort           int
+
+	// PreviousSerial — заводской номер, который был до замены счётчика,
+	// ReplacedAt — месяц замены (YYYY-MM), с которого идёт новый отсчёт.
+	PreviousSerial string
+	ReplacedAt     string
+}
+
+// SerialChanged — заводской номер сменился. С этого месяца счётчик новый,
+// поэтому показания могут быть меньше предыдущих.
+func (m Meter) SerialChanged(prev string) bool {
+	cur := strings.TrimSpace(m.Serial)
+	old := strings.TrimSpace(prev)
+	return cur != "" && old != "" && !strings.EqualFold(cur, old)
+}
+
+// DetailShort — марка и заводской номер без места установки.
+func (m Meter) DetailShort() string {
+	switch {
+	case m.Brand != "" && m.Serial != "":
+		return m.Brand + " — " + m.Serial
+	case m.Brand != "":
+		return m.Brand
+	case m.Serial != "":
+		return m.Serial
+	}
+	return ""
+}
+
+// LabelShort — «ХВС Бетар-м №9499449» для ведомости.
+func (m Meter) LabelShort() string {
+	parts := []string{m.Resource.Short()}
+	if m.Brand != "" {
+		parts = append(parts, m.Brand)
+	}
+	if m.Serial != "" {
+		parts = append(parts, "№"+m.Serial)
+	}
+	if len(parts) == 1 && m.Label != "" {
+		parts = append(parts, m.Label)
+	}
+	return strings.Join(parts, " ")
 }
 
 const (
@@ -173,7 +217,7 @@ func (r Resource) Short() string {
 	case WaterHot:
 		return "ГВС"
 	case Energy:
-		return "Электро"
+		return "Электроэнергия"
 	}
 	return string(r)
 }
@@ -201,3 +245,6 @@ func (r Resource) Unit() string {
 
 // IsWater сообщает, относится ли ресурс к водоснабжению.
 func (r Resource) IsWater() bool { return r == WaterCold || r == WaterHot }
+
+// IsEnergy сообщает, что ресурс — электроэнергия.
+func (r Resource) IsEnergy() bool { return r == Energy }

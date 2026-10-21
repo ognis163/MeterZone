@@ -1,0 +1,52 @@
+{{define "document"}}
+<article class="doc-sheet doc-{{.Kind}}" id="doc">
+  <div class="doc">
+    <header class="doc-head">
+      <h1 class="doc-title">{{.Title}}</h1>
+      <div class="doc-rule"><span class="doc-sub">{{.Subtitle}}</span></div>
+    </header>
+
+    {{if .Meta}}
+    <dl class="doc-meta">
+      {{range .Meta}}
+      <dt>{{.Label}}</dt>
+      <dd>{{range $i, $line := .Lines}}{{if $i}}<span class="doc-val-line">{{$line}}</span>{{else}}{{$line}}{{end}}{{end}}</dd>
+      {{end}}
+    </dl>
+    {{end}}
+
+    {{if .Empty}}<p class="doc-empty">{{.Empty}}</p>{{end}}
+
+    {{range .Sections}}{{$sec := .}}
+    <section class="doc-section">
+      {{if .Title}}<h2 class="doc-h2{{if .PlainTitle}} is-plain{{end}}"><span>{{.Title}}</span></h2>{{end}}
+      <div class="doc-table-wrap">
+        <table class="doc-table">
+          <colgroup>{{range .Columns}}<col style="width:{{.Pct}}%">{{end}}</colgroup>
+          <thead>
+            {{if .Groups}}<tr class="doc-groups">{{range .Groups}}<th colspan="{{.Span}}" scope="colgroup" class="doc-group">{{.Title}}</th>{{end}}</tr>{{end}}
+            <tr>{{range .Columns}}<th scope="col" class="{{.Class}}">{{range .Lines}}<span class="doc-th-line">{{.}}</span>{{end}}</th>{{end}}</tr>
+          </thead>
+          <tbody>
+            {{range $ri, $row := .Rows}}<tr{{if or $row.Shade (and $sec.HighlightLast (eq $ri (sub (len $sec.Rows) 1)))}} class="doc-hl"{{end}}>{{range $ci, $cell := $row.Cells}}{{$col := index $sec.Columns $ci}}<td class="{{$col.Class}}{{if $cell.Muted}} is-muted{{end}}{{if $cell.Strong}} is-strong{{end}}"><span class="doc-cell">{{$cell.Text}}</span></td>{{end}}</tr>{{end}}
+          </tbody>
+          {{if .Total}}<tfoot><tr class="doc-total">{{range $i, $cell := .Total}}{{$col := index $sec.Columns $i}}<td class="{{$col.Class}}{{if $cell.Muted}} is-muted{{end}}"><span class="doc-cell">{{$cell.Text}}</span></td>{{end}}</tr></tfoot>{{end}}
+        </table>
+      </div>
+    </section>
+    {{end}}
+
+    {{if .Signature}}
+    <div class="doc-sign">
+      <span>Показания сняты «____» ________________ 20____ г.</span>
+      <span class="doc-sign-right">Подпись<span class="doc-sign-line"></span></span>
+    </div>
+    {{end}}
+  </div>
+
+  <footer class="doc-foot">
+    <span>Документ сформирован автоматически · {{dateTimeRu .Generated}}</span>
+    <span>MeterZone</span>
+  </footer>
+</article>
+{{end}}

@@ -17,6 +17,7 @@
 <title>{{.Title}} · MeterZone</title>
 <script src="/assets/theme.js?v={{.AssetVersion}}"></script>
 <link rel="stylesheet" href="/assets/app.css?v={{.AssetVersion}}">
+<link rel="stylesheet" href="/assets/doc.css?v={{.AssetVersion}}">
 <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
 </head>
 <body>
@@ -27,13 +28,13 @@
     <a class="brand" href="/" aria-label="MeterZone — на главную">
       {{template "logo"}}
     </a>
+    {{if .SaveStatus}}<span class="topbar-save" role="status" aria-live="polite" data-save-status hidden></span>{{end}}
     {{if .Flash}}<div class="topbar-flash" role="status">{{.Flash}}</div>{{end}}
-    {{if .Error}}<div class="topbar-flash is-error" role="alert">{{.Error}}</div>{{end}}
     <div class="topbar-right">
+      {{if .Error}}<div class="topbar-flash is-error" role="alert">{{.Error}}</div>{{end}}
       <nav class="topnav" aria-label="Основная навигация">
         <a href="/" {{if eq .Nav "home"}}class="is-active" aria-current="page"{{end}}>Показания</a>
         <a href="/journal" {{if eq .Nav "journal"}}class="is-active" aria-current="page"{{end}}>Журнал</a>
-        <a href="/reports" {{if eq .Nav "reports"}}class="is-active" aria-current="page"{{end}}>Отчёты</a>
         <a href="/objects" {{if eq .Nav "objects"}}class="is-active" aria-current="page"{{end}}>Объекты</a>
         <a href="/settings" {{if eq .Nav "settings"}}class="is-active" aria-current="page"{{end}}>Настройки</a>
       </nav>
@@ -60,9 +61,6 @@
   </a>
   <a href="/journal" {{if eq .Nav "journal"}}class="is-active" aria-current="page"{{end}}>
     {{template "icon-journal"}}<span>Журнал</span>
-  </a>
-  <a href="/reports" {{if eq .Nav "reports"}}class="is-active" aria-current="page"{{end}}>
-    {{template "icon-report"}}<span>Отчёты</span>
   </a>
   <a href="/objects" {{if eq .Nav "objects"}}class="is-active" aria-current="page"{{end}}>
     {{template "icon-home"}}<span>Объекты</span>

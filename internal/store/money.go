@@ -35,6 +35,55 @@ func (s *Store) MoneyForMonth(objectID int64, period string) (map[model.Account]
 	return out, rows.Err()
 }
 
+// MoneyAccountIn возвращает записи одного лицевого счёта за период:
+// месяц → запись. Ключ — «YYYY-MM», как он хранится в базе.
+// Таблица начислений ведёт аванс и счёт в одной записи счёта, поэтому
+// остальные счета объекта в неё не подмешиваются.
+func (s *Store) MoneyAccountIn(objectID int64, account model.Account, from, to model.Period) (map[string]model.Record, error) {
+	accounts := []any{account}
+	if account == model.AccountWaterCold {
+		accounts = append(accounts, model.AccountWater) // старые данные
+	}
+	query := `SELECT period, charged, advance, advance_paid, paid_flag
+		FROM money WHERE object_id = ? AND period >= ? AND period <= ? AND account IN (?`
+	args := []any{objectID, from.String(), to.String(), accounts[0]}
+	for _, a := range accounts[1:] {
+		query += ", ?"
+		args = append(args, a)
+	}
+	query += ")"
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]model.Record{}
+	for rows.Next() {
+		var (
+			period              string
+			charged, advance    float64
+			advancePaid, paidFl int
+		)
+		if err := rows.Scan(&period, &charged, &advance, &advancePaid, &paidFl); err != nil {
+			return nil, err
+		}
+		rec := out[period]
+		rec.Period = period
+		rec.InvoiceSum = model.Round2(rec.InvoiceSum + charged)
+		rec.AdvanceSum = model.Round2(rec.AdvanceSum + advance)
+		rec.InvoicePaid = rec.InvoicePaid || paidFl != 0
+		rec.AdvancePaid = rec.AdvancePaid || advancePaid != 0
+		out[period] = rec
+	}
+	return out, rows.Err()
+}
+
+// MoneyAccountForYear возвращает записи одного лицевого счёта за год.
+func (s *Store) MoneyAccountForYear(objectID int64, account model.Account, year int) (map[string]model.Record, error) {
+	return s.MoneyAccountIn(objectID, account,
+		model.Period{Year: year, Month: 1}, model.Period{Year: year, Month: 12})
+}
+
 // SaveMoney сохраняет счета, авансы и отметки об оплате за месяц.
 // Частичное обновление: сохраняются только переданные счета, остальные не трогаются.
 func (s *Store) SaveMoney(items []model.Money, period string) error {

@@ -55,6 +55,16 @@ func (s *Server) handleObjects(w http.ResponseWriter, r *http.Request) {
 	s.render(w, http.StatusOK, "objects", data)
 }
 
+type objectDeleteData struct {
+	Base
+	Object    model.Object
+	Meters    int
+	Readings  int
+	FirstText string
+	LastText  string
+	HasData   bool
+}
+
 type objectFormData struct {
 	Base
 	Object        model.Object
@@ -203,11 +213,85 @@ func (s *Server) handleObjectDelete(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, http.StatusNotFound, "Объект не найден", "Некорректный адрес объекта.")
 		return
 	}
+	r.ParseForm()
+	_, _, hasData := s.Store.PeriodRange(id)
+	if hasData && r.PostFormValue("confirmed") == "" {
+		s.redirect(w, r, fmt.Sprintf("/objects/%d/delete?ask=1", id))
+		return
+	}
 	if err := s.Store.DeleteObject(id); err != nil {
 		s.fail(w, http.StatusInternalServerError, "Ошибка", "Не удалось удалить объект.")
 		return
 	}
 	s.redirect(w, r, "/objects?ok=deleted")
+}
+
+// handleObjectDeleteAsk показывает, чем закончится удаление объекта:
+// показания можно сохранить выгрузкой до удаления.
+func (s *Server) handleObjectDeleteAsk(w http.ResponseWriter, r *http.Request) {
+	s.renderObjectDelete(w, r, "")
+}
+
+func (s *Server) renderObjectDelete(w http.ResponseWriter, r *http.Request, msg string) {
+	id, ok := parseID(r, "id")
+	if !ok {
+		s.fail(w, http.StatusNotFound, "Объект не найден", "Некорректный адрес объекта.")
+		return
+	}
+	obj, err := s.Store.Object(id)
+	if err != nil {
+		s.fail(w, http.StatusNotFound, "Объект не найден", "Возможно, он был удалён.")
+		return
+	}
+	meters, _ := s.Store.Meters(id, true)
+	first, last, hasData := s.Store.PeriodRange(id)
+	base := s.base("Удаление объекта", "objects")
+	base.Error = msg
+	s.withObjectContext(w, r, &base, obj.ID, "/")
+	count := 0
+	for _, m := range meters {
+		if per, err := s.Store.ReadingsAfter(m.ID, ""); err == nil {
+			count += len(per)
+		}
+	}
+	status := http.StatusOK
+	if msg != "" {
+		status = http.StatusBadRequest
+	}
+	s.render(w, status, "object_delete", objectDeleteData{
+		Base:      base,
+		Object:    obj,
+		Meters:    len(meters),
+		Readings:  count,
+		FirstText: first,
+		LastText:  last,
+		HasData:   hasData,
+	})
+}
+
+// handleObjectExport отдаёт показания объекта перед удалением: CSV (Excel)
+// или PDF за весь период.
+func (s *Server) handleObjectExport(w http.ResponseWriter, r *http.Request) {
+	id, ok := parseID(r, "id")
+	if !ok {
+		s.fail(w, http.StatusNotFound, "Объект не найден", "Некорректный адрес объекта.")
+		return
+	}
+	obj, err := s.Store.Object(id)
+	if err != nil {
+		s.fail(w, http.StatusNotFound, "Объект не найден", "Возможно, он был удалён.")
+		return
+	}
+	rows, err := s.Store.ReadingsForObjectExport(id)
+	if err != nil || len(rows) == 0 {
+		s.renderObjectDelete(w, r, "У объекта нет показаний для выгрузки.")
+		return
+	}
+	if r.URL.Query().Get("format") == "pdf" {
+		s.objectReadingsPDF(w, obj, rows)
+		return
+	}
+	s.objectReadingsCSV(w, obj, rows)
 }
 
 // ---------------------------------------------------------------- приборы
@@ -272,14 +356,15 @@ func (s *Server) handleMeterEdit(w http.ResponseWriter, r *http.Request) {
 	s.withObjectContext(w, r, &base, obj.ID, "/")
 	meters, _ := s.Store.Meters(m.ObjectID, true)
 	s.render(w, http.StatusOK, "meter_form", meterFormData{
-		Base:          base,
+		Base: base,
 		Meter:         m,
 		Object:        obj,
 		Resources:     model.ResourceOrder,
 		ParentOptions: activeParentOptions(meters, m.ID),
+		// Это правка существующего прибора: показываем блок удаления.
+		IsNew: false,
 	})
 }
-
 func (s *Server) handleMeterSave(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		s.fail(w, http.StatusBadRequest, "Ошибка", "Не удалось прочитать форму.")
@@ -317,7 +402,7 @@ func (s *Server) handleMeterSave(w http.ResponseWriter, r *http.Request) {
 	if startRaw != "" {
 		v, err := model.ParseValue(startRaw)
 		if err != nil {
-			s.meterError(w, r, m, "Начальное показание: "+err.Error())
+			s.meterError(w, r, m, "Начальные показания: "+err.Error())
 			return
 		}
 		m.StartValue = v
@@ -329,6 +414,10 @@ func (s *Server) handleMeterSave(w http.ResponseWriter, r *http.Request) {
 	}
 	meters, _ := s.Store.Meters(objectID, true)
 	if raw := strings.TrimSpace(r.PostFormValue("parent_id")); raw != "" && raw != "0" {
+		if m.Resource != model.Energy {
+			s.meterError(w, r, m, "Дублирующий счётчик возможен только для электроэнергии.")
+			return
+		}
 		parentID, err := strconv.ParseInt(raw, 10, 64)
 		if err != nil || parentID <= 0 {
 			s.meterError(w, r, m, "Некорректный родительский прибор.")
@@ -372,6 +461,22 @@ func (s *Server) handleMeterSave(w http.ResponseWriter, r *http.Request) {
 	} else if m.ID != 0 {
 		if old, err := s.Store.Meter(m.ID); err == nil {
 			m.Archived = old.Archived
+		}
+	}
+	if m.ID != 0 {
+		// Смена заводского номера — это замена счётчика: запоминаем прежний
+		// номер, чтобы в этом и следующем месяце можно было ввести показания
+		// меньше предыдущих.
+		if old, err := s.Store.Meter(m.ID); err == nil {
+			m.PreviousSerial = old.PreviousSerial
+			m.ReplacedAt = old.ReplacedAt
+			if m.SerialChanged(old.Serial) {
+				m.PreviousSerial = old.Serial
+				m.ReplacedAt = time.Now().In(s.Loc).Format("2006-01")
+			}
+			if m.Serial == "" || strings.EqualFold(strings.TrimSpace(m.Serial), strings.TrimSpace(old.Serial)) {
+				m.PreviousSerial = old.PreviousSerial
+			}
 		}
 	}
 	if _, err := s.Store.Object(objectID); err != nil {
@@ -471,10 +576,12 @@ func descendantOf(meters []model.Meter, candidateID, ancestorID int64) bool {
 	return true
 }
 
+// activeParentOptions — приборы, к которым можно привязать дублирующий
+// счётчик: это возможно только для электроэнергии.
 func activeParentOptions(meters []model.Meter, excludeID int64) []model.Meter {
 	out := make([]model.Meter, 0, len(meters))
 	for _, m := range meters {
-		if m.ID == excludeID || m.Archived {
+		if m.ID == excludeID || m.Archived || m.Resource != model.Energy {
 			continue
 		}
 		if excludeID != 0 && descendantOf(meters, m.ID, excludeID) {

@@ -10,7 +10,6 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
-	"path"
 	"strings"
 	"time"
 
@@ -26,8 +25,8 @@ var templatesFS embed.FS
 var assetsFS embed.FS
 
 var pageNames = []string{
-	"index", "home_empty", "entry", "journal", "reports", "preview",
-	"objects", "object_form", "meter_form", "settings", "error",
+	"home_empty", "entry", "journal", "preview",
+	"objects", "object_form", "object_delete", "meter_form", "settings", "error",
 }
 
 // Server — веб-приложение.
@@ -65,6 +64,7 @@ func New(st *store.Store, loc *time.Location, version string, font []byte, backu
 		t, err := template.New("layout").Funcs(templateFuncs()).ParseFS(templatesFS,
 			"templates/layout.html",
 			"templates/partials.html",
+			"templates/document.html",
 			"templates/meter_fields.html",
 			"templates/"+name+".html",
 		)
@@ -93,6 +93,8 @@ type Base struct {
 	Flash        string
 	Error        string
 	Now          time.Time
+	// SaveStatus включает индикатор автосохранения в шапке.
+	SaveStatus bool
 
 	Objects            []model.Object
 	ObjectID           int64
@@ -115,6 +117,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /journal", s.handleJournal)
 
 	mux.HandleFunc("GET /reports", s.handleReportsForm)
+
 	mux.HandleFunc("GET /reports/preview", s.handlePreview)
 	mux.HandleFunc("GET /pdf", s.handlePDF)
 	mux.HandleFunc("POST /reports/send", s.handleSendReport)
@@ -125,6 +128,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /objects/save", s.handleObjectSave)
 	mux.HandleFunc("POST /objects/{id}/archive", s.handleObjectArchive)
 	mux.HandleFunc("POST /objects/{id}/delete", s.handleObjectDelete)
+	mux.HandleFunc("GET /objects/{id}/delete", s.handleObjectDeleteAsk)
+	mux.HandleFunc("GET /objects/{id}/export", s.handleObjectExport)
 
 	mux.HandleFunc("GET /meters/new", s.handleMeterNew)
 	mux.HandleFunc("GET /meters/{id}/edit", s.handleMeterEdit)
@@ -219,12 +224,9 @@ func templateFuncs() template.FuncMap {
 		"fmtVal":     model.FormatValue,
 		"fmtInput":   model.FormatInput,
 		"money":      model.FormatMoney,
-		"dateRu":     model.FormatDateRu,
 		"dateTimeRu": model.FormatDateTimeRu,
 		"period":     func(p model.Period) string { return p.Label() },
 		"short":      func(p model.Period) string { return p.ShortLabel() },
-		"monthShort": func(p model.Period) string { return p.MonthShort() },
-		"genitive":   func(p model.Period) string { return p.Genitive() },
 		"accusative": func(p model.Period) string { return p.Accusative() },
 		"add":        func(a, b int) int { return a + b },
 		"sub":        func(a, b int) int { return a - b },
@@ -266,15 +268,11 @@ func templateFuncs() template.FuncMap {
 				return "Все показания внесены"
 			}
 		},
-		"hasResource": func(list []model.Resource, r model.Resource) bool {
-			for _, v := range list {
-				if v == r {
-					return true
-				}
-			}
-			return false
-		},
-		"asset":     func(name string) string { return path.Join("/assets", name) },
+
+		// paytable принимает данные года для общего шаблона таблицы
+		// «Авансы и счета»: в журнале это .MoneyYearTable, на странице
+		// начислений — .moneyYearData.
+		"paytable": func(d moneyYearData) moneyYearData { return d },
 		"kindLabel": model.KindLabel,
 	}
 }

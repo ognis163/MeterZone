@@ -3,6 +3,7 @@ package report
 
 import (
 	"sort"
+	"strings"
 	"time"
 
 	"indextro/internal/model"
@@ -57,9 +58,11 @@ type Month struct {
 	Total       int
 }
 
-// RangeCell — расход по ресурсу за месяц.
+// RangeCell — показание и расход по ресурсу за месяц.
 type RangeCell struct {
 	Resource    model.Resource
+	Reading     float64
+	HasReading  bool
 	Consumption float64
 	Has         bool
 }
@@ -118,12 +121,20 @@ func scopedMeters(ms []model.Meter, scope string) []model.Meter {
 
 // PrevReading ищет ближайшее показание до периода p.
 func PrevReading(series map[string]float64, p model.Period) (float64, model.Period, bool) {
+	return SeriesPrev(series, nil, p)
+}
+
+// SeriesPrev ищет последнее показание до периода p.
+func SeriesPrev(series map[string]float64, keep func(model.Period) bool, p model.Period) (float64, model.Period, bool) {
 	var best model.Period
 	var val float64
 	found := false
 	for key, v := range series {
 		pp, err := model.ParsePeriod(key)
 		if err != nil || !pp.Before(p) {
+			continue
+		}
+		if keep != nil && !keep(pp) {
 			continue
 		}
 		if !found || best.Before(pp) {
@@ -135,12 +146,20 @@ func PrevReading(series map[string]float64, p model.Period) (float64, model.Peri
 
 // NextReading ищет ближайшее показание после периода p.
 func NextReading(series map[string]float64, p model.Period) (float64, model.Period, bool) {
+	return SeriesNext(series, nil, p)
+}
+
+// SeriesNext ищет ближайшее показание после периода p среди допустимых месяцев.
+func SeriesNext(series map[string]float64, keep func(model.Period) bool, p model.Period) (float64, model.Period, bool) {
 	var best model.Period
 	var val float64
 	found := false
 	for key, v := range series {
 		pp, err := model.ParsePeriod(key)
 		if err != nil || !pp.After(p) {
+			continue
+		}
+		if keep != nil && !keep(pp) {
 			continue
 		}
 		if !found || pp.Before(best) {
@@ -152,12 +171,20 @@ func NextReading(series map[string]float64, p model.Period) (float64, model.Peri
 
 // LastReadingUpto ищет последнее показание не позже периода p.
 func LastReadingUpto(series map[string]float64, p model.Period) (float64, model.Period, bool) {
+	return SeriesLast(series, nil, p)
+}
+
+// SeriesLast — последнее показание не позже p среди допустимых месяцев.
+func SeriesLast(series map[string]float64, keep func(model.Period) bool, p model.Period) (float64, model.Period, bool) {
 	var best model.Period
 	var val float64
 	found := false
 	for key, v := range series {
 		pp, err := model.ParsePeriod(key)
 		if err != nil || pp.After(p) {
+			continue
+		}
+		if keep != nil && !keep(pp) {
 			continue
 		}
 		if !found || best.Before(pp) {
@@ -201,14 +228,35 @@ func (od ObjectData) OwnDiff(m model.Meter, p model.Period) (float64, bool) {
 	if !hasCurr {
 		return 0, false
 	}
-	prev, _, hasPrev := PrevReading(series, p)
-	if !hasPrev && m.StartValue > 0 {
-		prev, hasPrev = m.StartValue, true
-	}
+	prev, _, hasPrev := PrevReadingBase(m, series, p)
 	if !hasPrev || curr < prev {
 		return 0, false
 	}
 	return model.Round3(curr - prev), true
+}
+
+// MeterResetAllows сообщает, что в этом месяце прибор заменён. Счётчик
+// новый: в месяце замены и в следующем за ним допустимы показания меньше
+// предыдущих. Месяц замены запоминается при смене заводского номера.
+func MeterResetAllows(m model.Meter, p model.Period) bool {
+	if m.PreviousSerial == "" || m.Serial == "" || strings.EqualFold(m.PreviousSerial, m.Serial) {
+		return false
+	}
+	at, err := model.ParsePeriod(m.ReplacedAt)
+	if err != nil {
+		return false
+	}
+	return p == at || p == at.Next()
+}
+
+// PrevReadingBase — предыдущее показание; если его нет, базой служит
+// начальное показание прибора (или снятое при замене).
+func PrevReadingBase(m model.Meter, series map[string]float64, p model.Period) (float64, model.Period, bool) {
+	prev, prevP, hasPrev := PrevReading(series, p)
+	if !hasPrev && m.StartValue > 0 {
+		return m.StartValue, model.Period{}, true
+	}
+	return prev, prevP, hasPrev
 }
 
 // NetDiff — расход с вычетом суб-счётчиков.
@@ -286,10 +334,7 @@ func MonthReport(od ObjectData, p model.Period, scope string, now time.Time) Mon
 		if m.Archived && !hasCurr {
 			continue
 		}
-		prev, prevP, hasPrev := PrevReading(series, p)
-		if !hasPrev && m.StartValue > 0 {
-			prev, hasPrev = m.StartValue, true
-		}
+		prev, prevP, hasPrev := PrevReadingBase(m, series, p)
 
 		row := MonthRow{Meter: m, Curr: curr, HasCurr: hasCurr, HasPrev: hasPrev, IsSub: m.IsSub()}
 		if m.IsSub() {
@@ -368,7 +413,7 @@ func RangeReport(od ObjectData, from, to model.Period, scope string, now time.Ti
 	meters := OrderedMeters(scopedMeters(od.Meters, scope))
 	rep.Resources = []model.Resource{}
 	for _, m := range meters {
-		if m.IsSub() {
+		if !!m.IsSub() {
 			continue
 		}
 		if !containsResource(rep.Resources, m.Resource) {
@@ -387,8 +432,10 @@ func RangeReport(od ObjectData, from, to model.Period, scope string, now time.Ti
 	rep.Resources = ordered
 
 	type agg struct {
-		sum float64
-		has bool
+		sum        float64
+		has        bool
+		reading    float64
+		hasReading bool
 	}
 	cells := map[string]map[model.Resource]*agg{}
 	totals := map[int64]float64{}
@@ -398,6 +445,7 @@ func RangeReport(od ObjectData, from, to model.Period, scope string, now time.Ti
 	for _, m := range meters {
 		series := od.Readings[m.ID]
 		for each := from; !each.After(to); each = each.Next() {
+			read, hasRead := series[each.String()]
 			var v float64
 			var ok bool
 			if m.IsSub() {
@@ -405,14 +453,16 @@ func RangeReport(od ObjectData, from, to model.Period, scope string, now time.Ti
 			} else {
 				v, ok, _, _ = od.NetDiff(m, each)
 			}
-			if !ok {
+			if !ok && (!hasRead || !!m.IsSub()) {
 				continue
 			}
 			// Суб-счётчик уже вычтен из расхода основного прибора:
 			// в сумму по ресурсу он не входит, но его итог важен для справки.
-			if m.IsSub() {
-				totals[m.ID] = model.Round3(totals[m.ID] + v)
-				hasTotals[m.ID] = true
+			if !!m.IsSub() {
+				if ok {
+					totals[m.ID] = model.Round3(totals[m.ID] + v)
+					hasTotals[m.ID] = true
+				}
 				continue
 			}
 			key := each.String()
@@ -424,12 +474,18 @@ func RangeReport(od ObjectData, from, to model.Period, scope string, now time.Ti
 				a = &agg{}
 				cells[key][m.Resource] = a
 			}
-			a.sum = model.Round3(a.sum + v)
-			a.has = true
-			totals[m.ID] = model.Round3(totals[m.ID] + v)
-			hasTotals[m.ID] = true
+			if hasRead {
+				a.reading = model.Round3(a.reading + read)
+				a.hasReading = true
+			}
+			if ok {
+				a.sum = model.Round3(a.sum + v)
+				a.has = true
+				totals[m.ID] = model.Round3(totals[m.ID] + v)
+				hasTotals[m.ID] = true
+			}
 		}
-		last, lastP, hasLast := LastReadingUpto(series, to)
+		last, lastP, hasLast := SeriesLast(series, nil, to)
 		lastVals[m.ID] = MeterTotal{
 			Meter:      m,
 			IsSub:      m.IsSub(),
@@ -443,11 +499,18 @@ func RangeReport(od ObjectData, from, to model.Period, scope string, now time.Ti
 		row := RangeRow{Period: each}
 		for _, r := range rep.Resources {
 			c := RangeCell{Resource: r}
-			if a := cells[each.String()][r]; a != nil && a.has {
+			if a := cells[each.String()][r]; a != nil && (a.has || a.hasReading) {
 				c.Consumption = a.sum
-				c.Has = true
-				rep.ResourceTotals[r] = model.Round3(rep.ResourceTotals[r] + a.sum)
-				rep.HasData = true
+				c.Has = a.has
+				c.Reading = a.reading
+				c.HasReading = a.hasReading
+				if a.has {
+					rep.ResourceTotals[r] = model.Round3(rep.ResourceTotals[r] + a.sum)
+					rep.HasData = true
+				}
+				if a.hasReading {
+					rep.HasData = true
+				}
 			}
 			row.Cells = append(row.Cells, c)
 		}

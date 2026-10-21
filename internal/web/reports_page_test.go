@@ -5,26 +5,67 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
+
+	"indextro/internal/model"
 )
 
-func TestReportsObjectSelectionDoesNotOpenPreview(t *testing.T) {
+// TestPreviewUsesDocumentLayout проверяет, что предпросмотр рисуется
+// из общей модели документа, а не отдельной вёрсткой.
+func TestPreviewUsesDocumentLayout(t *testing.T) {
 	_, _, h := newTestServer(t)
-	rr := request(t, h, http.MethodGet, "/reports?object=1", nil, "")
+	now := model.PeriodOf(time.Now())
+
+	rr := request(t, h, http.MethodGet,
+		"/reports/preview?object=1&kind=month&m="+now.String()+"&scope=all", nil, "")
 	if rr.Code != http.StatusOK {
-		t.Fatalf("код %d", rr.Code)
+		t.Fatalf("сведения: код %d", rr.Code)
 	}
 	body := rr.Body.String()
-	if !strings.Contains(body, `action="/reports"`) {
-		t.Fatal("форма должна перезагружать страницу отчётов")
+	for _, want := range []string{
+		`class="doc-sheet doc-month"`,
+		"Сведения о показаниях",
+		`class="doc-table"`,
+		"Показания сняты",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("в сведениях нет %q", want)
+		}
 	}
-	if strings.Contains(body, `action="/reports/preview"`) {
-		t.Fatal("выбор объекта не должен вести на предпросмотр")
+	if strings.Contains(body, `class="sheet"`) {
+		t.Fatal("осталась старая обёртка листа")
 	}
-	if !strings.Contains(body, `class="month-strip`) {
-		t.Fatal("нет полосы месяцев")
+
+	rr = request(t, h, http.MethodGet,
+		"/reports/preview?object=1&kind=range&from="+now.String()+"&to="+now.String()+"&scope=all", nil, "")
+	if rr.Code != http.StatusOK {
+		t.Fatalf("ведомость: код %d", rr.Code)
+	}
+	body = rr.Body.String()
+	for _, want := range []string{
+		`class="doc-sheet doc-range"`,
+		"Ведомость показаний",
+		"Приборы учёта",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("в ведомости нет %q", want)
+		}
 	}
 }
 
+// TestReportsRedirectsToJournal — страницы «Отчёты» больше нет: старые
+// ссылки ведут в журнал с тем же объектом, чтобы ничего не сломалось.
+func TestReportsRedirectsToJournal(t *testing.T) {
+	_, _, h := newTestServer(t)
+	rr := request(t, h, http.MethodGet, "/reports?object=1", nil, "")
+	if rr.Code != http.StatusFound {
+		t.Fatalf("код %d", rr.Code)
+	}
+	loc := rr.Header().Get("Location")
+	if !strings.HasPrefix(loc, "/journal") || !strings.Contains(loc, "object=1") {
+		t.Fatalf("редирект %q", loc)
+	}
+}
 func TestBackupEmailSettings(t *testing.T) {
 	srv, _, h := newTestServer(t)
 	form := url.Values{

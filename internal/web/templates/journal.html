@@ -2,7 +2,7 @@
 {{if not .Objects}}
 <section class="empty-card">
   <h2>Пока нет объектов</h2>
-  <p class="muted">Добавьте объект и приборы, чтобы увидеть журнал показаний.</p>
+  <p class="muted">Добавьте объект и приборы, чтобы увидеть журнал показаний и отчёты.</p>
   <a class="btn btn-primary" href="/objects/new">Добавить объект</a>
 </section>
 {{else}}
@@ -13,16 +13,37 @@
     <span class="jrange-cap">Период</span>
     <div class="segmented jrange-seg">
       {{range .Ranges}}
-      <a class="seg-link{{if .Active}} is-active{{end}}" href="{{.Href}}"{{if .Active}} aria-current="true"{{end}}>{{.Label}}</a>
+      <a class="seg-link{{if .Active}} is-active{{end}}{{if .Wide}} hide-sm{{end}}" href="{{.Href}}"{{if .Active}} aria-current="true"{{end}}>{{.Label}}</a>
       {{end}}
     </div>
     <form method="get" action="/journal" class="jrange-custom">
       <input type="hidden" name="object" value="{{.Object.ID}}">
-      <input type="month" name="from" value="{{.FromValue}}" min="2000-01" max="2100-12" aria-label="С месяца">
-      <span class="jrange-dash">—</span>
-      <input type="month" name="to" value="{{.ToValue}}" min="2000-01" max="2100-12" aria-label="По месяц">
+      {{if ne .Scope "all"}}<input type="hidden" name="scope" value="{{.Scope}}">{{end}}
+      <span class="jrange-range">
+        <input type="month" name="from" value="{{.FromValue}}" min="2000-01" max="2100-12" aria-label="С месяца">
+        <span class="jrange-dash">—</span>
+        <input type="month" name="to" value="{{.ToValue}}" min="2000-01" max="2100-12" aria-label="По месяц">
+      </span>
       <button class="btn btn-ghost btn-sm" type="submit">Показать</button>
     </form>
+  </div>
+
+  <div class="jrange jrange-scope">
+    <span class="jrange-cap">Что включить</span>
+    <div class="segmented jrange-seg">
+      <a class="seg-link{{if eq .Scope "all"}} is-active{{end}}" href="{{.ScopeAllHref}}"{{if eq .Scope "all"}} aria-current="true"{{end}}>Всё</a>
+      <a class="seg-link{{if eq .Scope "water"}} is-active{{end}}" href="{{.ScopeWaterHref}}"{{if eq .Scope "water"}} aria-current="true"{{end}}>Вода</a>
+      <a class="seg-link{{if eq .Scope "energy"}} is-active{{end}}" href="{{.ScopeEnergyHref}}"{{if eq .Scope "energy"}} aria-current="true"{{end}}>Электро</a>
+    </div>
+  </div>
+
+  <div class="jrange jrange-export">
+    <span class="jrange-cap">Выгрузка</span>
+    <div class="jrange-actions">
+      <a class="btn btn-ghost btn-sm" href="{{.CSVHref}}">{{template "icon-download"}} CSV</a>
+      <a class="btn btn-ghost btn-sm" href="{{.DocPDFHref}}">{{template "icon-report"}} PDF</a>
+      <button class="btn btn-ghost btn-sm" type="button" data-print>{{template "icon-print"}} Печать</button>
+    </div>
   </div>
 </section>
 
@@ -33,7 +54,15 @@
   <a class="btn btn-primary" href="/objects/{{.Object.ID}}/edit">Добавить прибор</a>
 </section>
 {{else}}
-{{if not .HasMonths}}
+{{if not .Resources}}
+<section class="empty-card">
+  <h2>Нет приборов этого вида</h2>
+  <p class="muted">У объекта нет счётчиков для выбранного фильтра.</p>
+  <a class="btn" href="{{.ScopeAllHref}}">Показать всё</a>
+</section>
+{{end}}
+
+{{if and .Resources (not .HasMonths)}}
 <section class="empty-card">
   <h2>За выбранный период показаний нет</h2>
   <p class="muted">Попробуйте другой диапазон: {{.FromLabel}} — {{.ToLabel}}.</p>
@@ -41,88 +70,39 @@
 {{end}}
 
 {{if .HasMonths}}
-<section class="panel j-summary">
+{{/* «Итоги» — та же сетка, что у начислений: месяц, колонки по ресурсам,
+     справа «Печать/отправить» — печатный лист за выбранный период. */}}
+<section class="panel money-table-panel">
   <div class="section-head">
     <h2>Итоги за {{.RangeLabel}}</h2>
-    <span class="jcount">месяцев с данными: {{.MonthsCount}}</span>
-  </div>
-  <div class="jtotals">
-    {{range .BookTotals}}
-    <div class="jtotal-card">
-      <span class="jtotal-name">{{.Label}}</span>
-      <span class="jtotal-value">{{.Consumption}} <small>{{.Unit}}</small></span>
+    <div class="section-head-side">
+      {{template "joursummary" .JournalTable}}
+      <a class="btn btn-ghost btn-sm" href="{{.JournalTable.StatementHref}}">{{template "icon-print"}} Печать/отправить</a>
     </div>
-    {{end}}
   </div>
-  <div class="jtable-wrap">
-    <table class="jtable">
-      <thead>
-        <tr>
-          <th class="jth-month">Месяц</th>
-          {{range .Resources}}
-          <th colspan="2">{{.Short}}</th>
-          {{end}}
-        </tr>
-        <tr class="jsub">
-          <th></th>
-          {{range .Resources}}
-          <th class="js">показание</th>
-          <th class="js">расход</th>
-          {{end}}
-        </tr>
-      </thead>
-      <tbody>
-        {{range .Rows}}
-        <tr class="jtr{{if .IsCurrent}} is-current{{end}}{{if not .HasAny}} is-empty-row{{end}}" data-period="{{.Period}}">
-          <td class="jtd-month">
-            <a href="{{.Href}}" class="jmonth-link">{{.Label}}</a>
-            {{if .IsCurrent}}<span class="jnow">сейчас</span>{{end}}
-          </td>
-          {{range .Cells}}
-          <td class="jtd-read">{{if .Reading}}{{.Reading}}{{else}}—{{end}}</td>
-          <td class="jtd-cons">{{if .Consumption}}{{.Consumption}}{{else}}—{{end}}</td>
-          {{end}}
-        </tr>
-        {{end}}
-      </tbody>
-      <tfoot>
-        <tr>
-          <th class="jtd-month">Итого</th>
-          {{range .BookTotals}}
-          <th class="jtd-read">—</th>
-          <th class="jtd-cons">{{.Consumption}} {{.Unit}}</th>
-          {{end}}
-        </tr>
-      </tfoot>
-    </table>
-  </div>
+  {{template "jourtable" .JournalTable}}
   <p class="hint jscroll-hint">На телефоне таблицу можно прокручивать вбок.</p>
-  <p class="hint">Показание — счётчик на конец месяца, расход — сколько израсходовано за месяц. Нажмите на месяц, чтобы внести или исправить данные.</p>
+  <p class="hint">Показания — счётчик на конец месяца, расход — сколько израсходовано за месяц. Нажмите на месяц, чтобы внести или исправить данные.</p>
 </section>
 {{end}}
 
-{{if .MoneyAny}}
-<section class="panel money-summary">
+{{/* Начисления — та же таблица, что на странице начислений, но по выбранному
+     периоду журнала: суммы и отметки об оплате правятся прямо здесь. */}}
+<section class="panel money-table-panel" data-pay-table data-object="{{.Object.ID}}">
   <div class="section-head">
-    <h2>Начисления за {{.RangeLabel}}</h2>
+    <h2>Начисления за {{.MoneyRange.RangeLabel}}</h2>
+    <div class="section-head-side">
+      {{template "paysummary" .MoneyRange.Totals}}
+      <a class="btn btn-ghost btn-sm" href="{{.MoneyRange.StatementHref}}">{{template "icon-print"}} Печать/отправить</a>
+    </div>
   </div>
-  <table class="simple-table">
-    <thead>
-      <tr><th>Счёт</th><th class="num">Сумма</th><th class="num">Оплачено</th><th class="num">Долг</th></tr>
-    </thead>
-    <tbody>
-      {{range .Money}}
-      <tr>
-        <td>{{.Label}}</td>
-        <td class="num">{{.ChargedText}}</td>
-        <td class="num">{{.PaidText}}</td>
-        <td class="num {{if gt .Debt 0.0}}neg{{else if lt .Debt 0.0}}adv{{end}}">{{.DebtText}}</td>
-      </tr>
-      {{end}}
-    </tbody>
-  </table>
+  {{template "paytable" (paytable .MoneyRange)}}
+  {{if not .MoneyAny}}
+  <p class="hint">Авансы и счета пока не заполнены — впишите суммы за нужные месяцы прямо в таблице.</p>
+  {{else}}
+  <p class="hint">Аванс и счёт по каждому месяцу, «Итого» — их сумма. Нажмите на статус, чтобы отметить оплату: оплаченная сумма блокируется.</p>
+  {{end}}
 </section>
-{{end}}
 {{end}}
 {{end}}
 {{end}}

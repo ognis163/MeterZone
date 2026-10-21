@@ -8,6 +8,12 @@
     return (root || document).querySelector(sel);
   };
 
+  // Переход на страницу возможен в пределах одного документа или одного
+  // сеанса браузера: судим по адресу, а заодно по метке времени.
+  var monthScrollStorage = "meterzone-month-pick";
+  var monthScrollWindow = 60000;
+  var smooth = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? false : true;
+
   function parseVal(raw) {
     if (raw == null) return null;
     var s = String(raw)
@@ -96,14 +102,33 @@
 
   // ---------- автосохранение ----------
   var entryForm = q("form[data-entry]");
-  var statusBox = q("[data-autosave-status] .savebar-status");
+  // Статус один и показывается в шапке; ввода показаний это тоже касается.
+  var statusBox = q("[data-save-status]");
   var pending = {}; // key -> функция отправки, выполняется по таймеру
   var saveSeq = 0;
+  var inflight = 0; // сколько запросов сохранения сейчас в пути
 
+  function track(promise) {
+    inflight++;
+    var done = function () { inflight = Math.max(0, inflight - 1); };
+    promise.then(done, done);
+    return promise;
+  }
+
+  // Сообщение в шапке живёт несколько секунд и исчезает: постоянной
+  // надписи «Показания сохраняются» больше нет.
+  var statusTimer = 0;
   function setStatus(text, kind) {
     if (!statusBox) return;
-    statusBox.textContent = text;
+    statusBox.textContent = text || "";
     statusBox.setAttribute("data-state", kind || "");
+    statusBox.hidden = !text;
+    clearTimeout(statusTimer);
+    if (!text) return;
+    statusTimer = setTimeout(function () {
+      statusBox.hidden = true;
+      statusBox.textContent = "";
+    }, 4000);
   }
 
   function markSaving() {
@@ -127,7 +152,7 @@
 
   function send(url, bodyOf) {
     markSaving();
-    return fetch(url, {
+    return track(fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8", "Accept": "application/json" },
       credentials: "same-origin",
@@ -141,7 +166,7 @@
     }).catch(function (err) {
       markFailed(err.message);
       throw err;
-    });
+    }));
   }
 
   function flushPending() {
@@ -150,6 +175,21 @@
       var fn = pending[key];
       delete pending[key];
       if (typeof fn === "function") fn();
+    });
+  }
+
+  // Перед PDF или печатью дожидаемся, пока автосохранение дошлёт данные.
+  function waitForSaves() {
+    flushPending();
+    return new Promise(function (resolve) {
+      var tries = 0;
+      (function wait() {
+        if (inflight <= 0 || tries++ > 50) {
+          resolve();
+          return;
+        }
+        setTimeout(wait, 100);
+      })();
     });
   }
 
@@ -222,24 +262,10 @@
     }
 
     // Финансы: автосохранение по уходу из поля и по кнопке-галочке.
-    var financeStatus = q("[data-finance-status]");
-
-    function setFinanceStatus(text, kind) {
-      if (!financeStatus) return;
-      financeStatus.textContent = text;
-      financeStatus.setAttribute("data-state", kind || "");
-    }
-
-    function financeSaved() {
-      var d = new Date();
-      var hh = ("0" + d.getHours()).slice(-2);
-      var mm = ("0" + d.getMinutes()).slice(-2);
-      setFinanceStatus("Сохранено " + hh + ":" + mm, "ok");
-    }
-
+    // Отдельного индикатора нет — статус в шапке общий для всех полей.
     function sendMoney(acc, field, value) {
-      setFinanceStatus("Сохранение…", "saving");
-      return fetch(moneyURL, {
+      markSaving();
+      return track(fetch(moneyURL, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
@@ -250,13 +276,13 @@
       }).then(function (resp) {
         return resp.json().catch(function () { return {}; }).then(function (data) {
           if (!resp.ok) throw new Error(data.error || "ошибка сохранения");
-          financeSaved();
+          markSaved();
           return data;
         });
       }).catch(function (err) {
-        setFinanceStatus("Не сохранено: " + err.message, "error");
+        markFailed(err.message);
         throw err;
-      });
+      }));
     }
 
     qa("[data-money-row]").forEach(function (row) {
@@ -266,7 +292,7 @@
         input.addEventListener("change", function () {
           var raw = input.value.trim();
           if (raw !== "" && parseVal(raw) == null) {
-            setFinanceStatus("Введите число", "error");
+            markFailed("введите число");
             return;
           }
           sendMoney(acc, field, raw).catch(function () {});
@@ -344,6 +370,25 @@
     });
   });
 
+  // Перед отправкой письма дожидаемся автосохранения.
+  qa("form[data-send-report]").forEach(function (form) {
+    form.addEventListener("submit", function (e) {
+      if (inflight <= 0 && !Object.keys(pending).length) return;
+      e.preventDefault();
+      waitForSaves().then(function () { form.submit(); });
+    });
+  });
+
+  // PDF и печать показывают уже сохранённые показания.
+  qa("[data-wait-save]").forEach(function (link) {
+    link.addEventListener("click", function (e) {
+      if (inflight <= 0 && !Object.keys(pending).length) return;
+      e.preventDefault();
+      var href = link.getAttribute("href");
+      waitForSaves().then(function () { window.location.href = href; });
+    });
+  });
+
   qa("[data-print]").forEach(function (btn) {
     btn.addEventListener("click", function () {
       window.print();
@@ -364,6 +409,46 @@
     });
   });
 
+  // Выбор месяца на главной: помним, что месяц только что выбран,
+  // и после перезагрузки мягко прокручиваем к вводу показаний.
+  qa("[data-month-pick]").forEach(function (cell) {
+    if (!cell.getAttribute("href")) return;
+    cell.addEventListener("click", function () {
+      try { window.sessionStorage.setItem(monthScrollStorage, String(Date.now())); } catch (e) {}
+    });
+  });
+
+  // Браузер может восстановить прежнюю позицию прокрутки — она не нужна:
+  // сразу после выбора месяца экран должен стоять на вводе показаний.
+  try {
+    if (window.sessionStorage.getItem(monthScrollStorage) && "scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+  } catch (e) {}
+
+  (function scrollToEntryAfterMonthPick() {
+    var stamp = 0;
+    try { stamp = Number(window.sessionStorage.getItem(monthScrollStorage) || 0); } catch (e) {}
+    try { window.sessionStorage.removeItem(monthScrollStorage); } catch (e) {}
+    if (!stamp || Date.now() - stamp > monthScrollWindow) return;
+    var target = q("[data-entry-main]");
+    if (!target) return;
+    // Даём странице разложиться (шрифты и размеры), затем прокручиваем.
+    var done = false;
+    function go() {
+      if (done) return;
+      done = true;
+      target.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
+    }
+    if (document.readyState === "complete") {
+      window.requestAnimationFrame(function () { window.requestAnimationFrame(go); });
+    } else {
+      window.addEventListener("load", go, { once: true });
+    }
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(go).catch(function () {});
+    setTimeout(go, 400);
+  })();
+
   // Плитки объектов: активный объект показываем в начале ленты.
   qa(".objectrail-scroll").forEach(function (rail) {
     var active = q(".object-tile.is-active", rail);
@@ -372,13 +457,38 @@
 
   // Полоса месяцев: выбранный месяц ставим к левому краю, остальные — прокруткой.
   qa("[data-month-strip]").forEach(function (strip) {
-    var selected = q(".month-cell.is-selected", strip);
-    if (selected) {
-      var oldBehavior = strip.style.scrollBehavior;
-      strip.style.scrollBehavior = "auto";
-      strip.scrollLeft = Math.max(0, selected.offsetLeft - 2);
-      strip.style.scrollBehavior = oldBehavior;
+    var userScrolled = false;
+    function centerSelected() {
+      if (userScrolled) return;
+      var cells = qa(".month-cell", strip);
+      var selected = q(".month-cell.is-selected", strip);
+      if (!cells.length || !selected) return;
+      // В ленте месяц тянется по содержимому, поэтому ширину задаём явно:
+      // тогда все 12 месяцев ложатся в полосу без лишнего запаса, а прокрутка
+      // к выбранному месяцу считается по тем же размерам.
+      var gap = parseFloat(getComputedStyle(strip).columnGap) || 3;
+      var inner = strip.clientWidth;
+      if (inner > 0) {
+        var cell = Math.floor((inner - 2 - (cells.length - 1) * gap) / cells.length);
+        if (cell >= 40) strip.style.setProperty("--cell-w", cell + "px");
+      }
+      var target = Math.max(0, Math.min(selected.offsetLeft - 2, strip.scrollWidth - strip.clientWidth));
+      if (target > 0) strip.scrollLeft = target;
     }
+    // До первого кадра браузер ещё не знает ширину ленты — ждём раскладку.
+    window.requestAnimationFrame(function () {
+      window.requestAnimationFrame(centerSelected);
+    });
+    // Пользователь сам дёрнул полосу — больше не переставляем.
+    ["wheel", "touchstart", "pointerdown", "keydown"].forEach(function (name) {
+      strip.addEventListener(name, function () { userScrolled = true; }, { passive: true });
+    });
+    qa(".month-mobile-arrow", strip.parentNode).forEach(function (arrow) {
+      arrow.addEventListener("click", function () { userScrolled = true; });
+    });
+    window.addEventListener("load", centerSelected);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(centerSelected).catch(function () {});
+    setTimeout(centerSelected, 300);
     strip.addEventListener("wheel", function (e) {
       if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
         e.preventDefault();
@@ -431,7 +541,7 @@
   });
 
   // Печать сразу после открытия предпросмотра (?print=1).
-  if (new URLSearchParams(window.location.search).get("print") === "1" && q(".sheet")) {
+  if (new URLSearchParams(window.location.search).get("print") === "1" && q(".doc-sheet")) {
     setTimeout(function () { window.print(); }, 500);
   }
 
@@ -484,7 +594,8 @@
   }
 
   // ---------- прибор учёта прямо в карточке объекта ----------
-    document.documentElement.setAttribute("data-js", "1");
+  document.documentElement.setAttribute("data-js", "1");
+  (function meterInline() {
       var panel = q("[data-meter-inline]");
       if (!panel) return;
       var form = q("form", panel);
@@ -557,8 +668,220 @@
           });
         });
       });
-    
-})();
+  })();
+
+  // --------------------------------------------------------------------
+  // Таблица «Авансы и счета»: в журнале только показывает, на странице
+  // «Начисления» — вводит суммы и отметки об оплате. Сохранение — обычными
+  // формами в /o/{id}/money, очередь одна на страницу, чтобы перед PDF,
+  // печатью и отправкой письма дописать всё.
+  // --------------------------------------------------------------------
+  (function () {
+    var panels = qa("[data-pay-table]");
+    if (!panels.length) return;
+
+    var queue = [];
+    var busy = false;
+    var moneyFmt0 = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 });
+
+    function money(v) { return moneyFmt0.format(round2(v)) + " ₽"; }
+    function totalText(v) { return round2(v) === 0 ? "—" : money(v); }
+    function amount(raw) {
+      var v = parseVal(raw);
+      return v == null || v < 0 ? 0 : round2(v);
+    }
+
+    function enqueue(job) {
+      queue.push(job);
+      pump();
+    }
+
+    function pump() {
+      if (busy) return;
+      var job = queue.shift();
+      if (!job) return;
+      busy = true;
+      job().catch(function (err) {
+        setStatus("Не сохранено: " + ((err && err.message) || "ошибка"), "error");
+      }).then(function () {
+        busy = false;
+        pump();
+      });
+    }
+
+    function flush() {
+      return new Promise(function (resolve) {
+        (function wait() {
+          if (!busy && !queue.length) return resolve();
+          setTimeout(wait, 60);
+        })();
+      });
+    }
+
+    // PDF пережидает очередь сохранения.
+    qa("a[href*='/pdf']").forEach(function (link) {
+      link.addEventListener("click", function (e) {
+        if (!busy && !queue.length) return;
+        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        flush().then(function () { window.location.href = link.href; });
+      });
+    });
+    qa("form[action='/charges/send'], form[action='/reports/send']").forEach(function (form) {
+      form.addEventListener("submit", function (e) {
+        if (!busy && !queue.length) return;
+        e.preventDefault();
+        flush().then(function () { form.submit(); });
+      });
+    });
+    qa("[data-print]").forEach(function (btn) {
+      btn.addEventListener("click", function (e) {
+        if (!busy && !queue.length) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        flush().then(function () { window.print(); });
+      }, true);
+    });
+
+    function markSaved() {
+      var d = new Date();
+      var hh = String(d.getHours()).padStart(2, "0");
+      var mm = String(d.getMinutes()).padStart(2, "0");
+      setStatus("Сохранено " + hh + ":" + mm, "ok");
+    }
+
+    panels.forEach(function (panel) {
+      var objectID = panel.getAttribute("data-object") || "";
+      var table = q("table.pay", panel);
+      if (!table) return;
+
+      var paidOut = panel.querySelector("[data-pay-paid]");
+      var dueOut = panel.querySelector("[data-pay-due]");
+      var foot = table.querySelector("[data-total-row]");
+      var editable = table.getAttribute("data-pay-edit") === "1";
+
+      // Каждая позиция вносит вклад либо в «оплачено», либо в «к оплате»;
+      // пустая не влияет ни на что, как в эталоне.
+      function contribution(input, btn) {
+        var v = amount(input.value);
+        if (v === 0) return { sum: 0, paid: 0, due: 0 };
+        if (btn && btn.classList.contains("paid")) return { sum: v, paid: v, due: 0 };
+        return { sum: v, paid: 0, due: v };
+      }
+
+      // Итог строки и сводка пересчитываются сразу.
+      function recalc() {
+        var adv = 0, inv = 0, paid = 0, due = 0;
+        qa("tbody tr", table).forEach(function (tr) {
+          var rowSum = 0;
+          qa(".cell", tr).forEach(function (cell, i) {
+            var input = q("input.num", cell);
+            if (!input) return;
+            var c = contribution(input, q(".st", cell));
+            rowSum += c.sum;
+            paid += c.paid;
+            due += c.due;
+            if (i === 0) adv += c.sum; else inv += c.sum;
+          });
+          var out = q("td[data-total]", tr);
+          if (out) out.textContent = totalText(rowSum);
+        });
+        if (foot) {
+          var tds = qa("td", foot);
+          if (tds[1] && q(".num-total", tds[1])) q(".num-total", tds[1]).textContent = money(adv);
+          if (tds[2] && q(".num-total", tds[2])) q(".num-total", tds[2]).textContent = money(inv);
+          if (tds[3]) tds[3].textContent = totalText(adv + inv);
+        }
+        if (paidOut) paidOut.textContent = money(paid);
+        if (dueOut) dueOut.textContent = money(due);
+      }
+
+      function paint(cell) {
+        var btn = q(".st", cell);
+        var input = q("input.num", cell);
+        if (!btn || !input) return;
+        var v = amount(input.value);
+        var paid = v > 0 && btn.classList.contains("paid");
+        var state = paid ? ["paid", "Оплачен"] : (v === 0 ? ["empty", "Не задан"] : ["due", "Не оплачен"]);
+        btn.classList.remove("paid", "due", "empty");
+        btn.classList.add(state[0]);
+        btn.textContent = state[1];
+        btn.setAttribute("aria-pressed", paid ? "true" : "false");
+        input.disabled = paid;
+      }
+
+      function save(input) {
+        var cell = input.closest(".cell");
+        var url = "/o/" + encodeURIComponent(objectID) + "/money?m=" +
+          encodeURIComponent(input.getAttribute("data-p"));
+        var body = "field=" + encodeURIComponent(input.getAttribute("data-f")) +
+          "&value=" + encodeURIComponent(input.value.trim()) +
+          "&paid=" + (q(".st.paid", cell) ? "1" : "") +
+          "&account=";
+        enqueue(function () {
+          return fetch(url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+              "Accept": "application/json"
+            },
+            credentials: "same-origin",
+            body: body
+          }).then(function (resp) {
+            return resp.json().catch(function () { return {}; }).then(function (data) {
+              if (!resp.ok) throw new Error(data.error || "ошибка сохранения");
+              markSaved();
+              return data;
+            });
+          });
+        });
+      }
+
+      if (!editable) return;
+
+      var timers = {};
+      function keyOf(input) {
+        return input.getAttribute("data-p") + "|" + input.getAttribute("data-f");
+      }
+
+      table.addEventListener("click", function (e) {
+        var btn = e.target.closest ? e.target.closest(".st") : null;
+        if (!btn || !table.contains(btn)) return;
+        var cell = btn.closest(".cell");
+        var input = q("input.num", cell);
+        if (!input) return;
+        if (amount(input.value) === 0) return; // оплачивать нечего
+        btn.classList.toggle("paid");
+        paint(cell);
+        recalc();
+        save(input);
+      });
+
+      table.addEventListener("input", function (e) {
+        var input = e.target;
+        if (!input.classList || !input.classList.contains("num")) return;
+        paint(input.closest(".cell"));
+        recalc();
+        var key = keyOf(input);
+        clearTimeout(timers[key]);
+        timers[key] = setTimeout(function () {
+          delete timers[key];
+          save(input);
+        }, 600);
+      });
+
+      table.addEventListener("change", function (e) {
+        var input = e.target;
+        if (!input.classList || !input.classList.contains("num")) return;
+        var key = keyOf(input);
+        clearTimeout(timers[key]);
+        delete timers[key];
+        paint(input.closest(".cell"));
+        recalc();
+        save(input);
+      });
+    });
+  })();
 
   // Уведомление в шапке исчезает само.
   // Сообщение о будущем месяце показываем как обычное уведомление.
@@ -580,3 +903,4 @@
       setTimeout(function () { el.remove(); }, 300);
     }, 4200);
   });
+})();

@@ -2,6 +2,7 @@ package store
 
 import (
 	"os"
+	"strings"
 	"time"
 )
 
@@ -87,12 +88,49 @@ type ExportRow struct {
 
 // AllReadingsForExport возвращает все показания с расшифровкой.
 func (s *Store) AllReadingsForExport() ([]ExportRow, error) {
-	rows, err := s.db.Query(`SELECT o.name, o.address, o.owner, m.label, m.serial, m.resource,
+	return s.exportReadings(0)
+}
+
+// ReadingsForObjectExport возвращает показания одного объекта.
+func (s *Store) ReadingsForObjectExport(objectID int64) ([]ExportRow, error) {
+	return s.exportReadings(objectID)
+}
+
+// ReadingsExportPeriod возвращает показания объекта за период: так журнал
+// выгружает только выбранные месяцы. Нулевой объект — все объекты.
+func (s *Store) ReadingsExportPeriod(objectID int64, from, to string) ([]ExportRow, error) {
+	return s.exportReadingsPeriod(objectID, from, to)
+}
+
+func (s *Store) exportReadings(objectID int64) ([]ExportRow, error) {
+	return s.exportReadingsPeriod(objectID, "", "")
+}
+
+func (s *Store) exportReadingsPeriod(objectID int64, from, to string) ([]ExportRow, error) {
+	query := `SELECT o.name, o.address, o.owner, m.label, m.serial, m.resource,
 		r.period, r.value
 		FROM readings r
 		JOIN meters m ON m.id = r.meter_id
-		JOIN objects o ON o.id = m.object_id
-		ORDER BY o.name, m.resource, m.id, r.period`)
+		JOIN objects o ON o.id = m.object_id`
+	args := []any{}
+	where := []string{}
+	if objectID != 0 {
+		where = append(where, `o.id = ?`)
+		args = append(args, objectID)
+	}
+	if from != "" {
+		where = append(where, `r.period >= ?`)
+		args = append(args, from)
+	}
+	if to != "" {
+		where = append(where, `r.period <= ?`)
+		args = append(args, to)
+	}
+	if len(where) > 0 {
+		query += ` WHERE ` + strings.Join(where, ` AND `)
+	}
+	query += ` ORDER BY o.name, m.resource, m.id, r.period`
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
