@@ -2535,89 +2535,108 @@ html, body { overscroll-behavior-x: none; }
 .jcount { font-weight: 400; }
 /* ==========================================================================
 /* ==========================================================================
-   Начисления в журнале: по колонке на каждый счёт.
-   Спокойное оформление: цвет — мягкой плашкой у названия и лёгкой заливкой
-   неоплаченной ячейки; точки убраны, у полей нет рамок.
+   Начисления в журнале: карточка на каждый месяц.
+   Спокойно и без шума: оплаченное приглушено, неоплаченное — обычными
+   чернилами, галочка справа, у полей нет рамок.
    ========================================================================== */
 
-.pay.grid { min-width: 0; }
-.pay.grid th, .pay.grid td { padding: 10px 9px; }
+.money-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
 
-.pay-group {
-  text-align: center !important;
-  font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em;
-  color: var(--faint); font-weight: 600;
+.money-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px 8px;
+  background: var(--surface);
+  min-width: 0;
+}
+.money-card.is-current { border-color: var(--line-strong); }
+
+.money-card-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 8px; padding-bottom: 6px; margin-bottom: 2px;
   border-bottom: 1px solid var(--line);
 }
-.pay-sub th.acc {
-  font-size: 11.5px; font-weight: 600; text-transform: none; letter-spacing: 0;
-  padding-top: 0; padding-bottom: 9px;
-  border-bottom: 1px solid var(--line);
+.money-card-month { font-size: 13px; font-weight: 600; letter-spacing: -.01em; }
+.money-card-total { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.money-line {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  padding: 6px 0;
 }
-.pay-sub th.acc cite {
-  font-style: normal;
-  display: inline-block; padding: 1px 7px; border-radius: 5px;
-  background: color-mix(in srgb, var(--tone) 13%, transparent);
-  color: var(--ink-2);
+.money-line + .money-line { border-top: 1px solid var(--line); }
+
+.money-line-name {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .03em;
+  color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-.money-table-panel { --tone-cold: #6c93a6; --tone-hot: #a88274; --tone-energy: #9c8a5c; }
-:root[data-theme="dark"] .money-table-panel { --tone-cold: #7fa3b5; --tone-hot: #c09a8b; --tone-energy: #b3a075; }
+.tone-cold { --tone: #6c93a6; }
+.tone-hot { --tone: #a88274; }
+.tone-energy { --tone: #9c8a5c; }
+.money-line-name.tone-cold, .money-line-name.tone-hot, .money-line-name.tone-energy { color: var(--tone); }
 
-.tone-cold { --tone: var(--tone-cold); }
-.tone-hot { --tone: var(--tone-hot); }
-.tone-energy { --tone: var(--tone-energy); }
-
-/* Ячейка счёта: сумма как текст, галочка справа. */
-.pay .money-cell { padding: 6px 8px; }
-.pay .money-cell .val {
-  display: inline-flex; align-items: center; justify-content: flex-end;
-  gap: 6px; min-width: 74px;
+.money-line-cell { display: flex; align-items: center; justify-content: flex-end; min-width: 0; }
+.money-card-cols {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  padding: 3px 0 0;
+  font-size: 8.5px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--faint);
 }
-.pay .money-cell .num {
-  width: 74px; min-height: 0; padding: 4px 2px;
-  font-size: 13.5px; text-align: right;
+.money-card-cols span:nth-child(2),
+.money-card-cols span:nth-child(3) { text-align: right; padding-right: 20px; }
+
+/* Ячейка: сумма как текст, галочка справа. */
+.money-cell {
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 3px; min-width: 0; border-radius: 6px;
+}
+.money-cell.is-off { min-height: 22px; }
+.money-cell .num {
+  width: 100%; min-width: 0; min-height: 0;
+  padding: 2px 3px; font-size: 13.5px; text-align: right;
   border: 0; border-radius: 6px;
   background: transparent; color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
-.pay .money-cell .num:hover { background: var(--surface-2); }
-.pay .money-cell .num:focus {
+.money-cell .num:hover { background: var(--surface-2); }
+.money-cell .num:focus {
   outline: none; background: var(--surface-2);
   box-shadow: inset 0 -1.5px 0 var(--accent);
 }
-.pay .money-cell .num:disabled {
-  background: transparent; color: var(--ink);
-  -webkit-text-fill-color: var(--ink); opacity: 1; cursor: default;
+.money-cell .num:disabled {
+  background: transparent; opacity: 1; cursor: default;
+  color: var(--muted); -webkit-text-fill-color: var(--muted);
 }
-.pay .money-cell .num::placeholder { color: var(--faint); }
+.money-cell .num::placeholder { color: var(--faint); }
 
-/* Неоплаченное — мягкая заливка цвета счёта. */
-.pay .money-cell.is-unpaid { background: color-mix(in srgb, var(--tone) 11%, transparent); }
-.pay .money-cell.is-paid .num { color: var(--muted); }
-
-/* Галочка оплаты: у оплаченной ячейки видна, у неоплаченной — по наведению. */
-.pay .paycheck {
+.money-cell .paycheck {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 16px; height: 16px; padding: 0; flex: none;
+  width: 15px; height: 15px; padding: 0; flex: none;
   border: 0; border-radius: 4px; background: none;
   color: var(--ok); opacity: 0;
   transition: opacity .12s ease, background .12s ease;
 }
-.pay .paycheck svg { width: 11px; height: 11px; }
-.pay .paycheck.is-paid { opacity: .55; }
-.pay .money-cell:hover .paycheck,
-.pay .money-cell:focus-within .paycheck { opacity: .9; }
-.pay .paycheck:hover { background: var(--surface-2); opacity: 1; }
-.pay .paycheck:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; opacity: 1; }
-@media (hover: none) { .pay .paycheck { opacity: .5; } }
+.money-cell .paycheck svg { width: 10px; height: 10px; }
+.money-cell .paycheck.is-paid { opacity: .5; }
+.money-cell:hover .paycheck,
+.money-cell:focus-within .paycheck { opacity: .9; }
+.money-cell .paycheck:hover { background: var(--surface-2); opacity: 1; }
+.money-cell .paycheck:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; opacity: 1; }
+@media (hover: none) { .money-cell .paycheck { opacity: .45; } }
 
-.pay .money-total { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--muted); }
-.pay.grid tfoot td { border-top: 1px solid var(--line-strong); padding-top: 12px; }
-.pay.grid tfoot td.total { color: var(--ink); }
-
-@media (max-width: 759px) {
-  .pay.grid { min-width: 660px; }
-  .pay.grid th, .pay.grid td { padding: 9px 6px; }
-  .pay .money-cell .num { width: 66px; font-size: 13px; }
-  .pay .money-cell .val { min-width: 66px; }
+@media (max-width: 1000px) {
+  .money-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .money-cards { grid-template-columns: minmax(0, 1fr); }
+  .money-line { grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1fr); }
 }

@@ -672,8 +672,8 @@
 
   // --------------------------------------------------------------------
   // --------------------------------------------------------------------
-  // Начисления в журнале: у каждого счёта своя колонка в «Авансе» и «Счёте».
-  // Сумма и отметка оплаты сохраняются сразу, сводка пересчитывается на месте.
+  // Начисления в журнале: карточка на месяц, в ней счета с авансом и счётом.
+  // Сумма и отметка оплаты сохраняются сразу, итоги пересчитываются на месте.
   // --------------------------------------------------------------------
   (function () {
     var grids = qa("[data-money-grid]");
@@ -687,35 +687,33 @@
       return v == null || v < 0 ? 0 : round2(v);
     }
 
-    grids.forEach(function (table) {
-      var panel = table.closest("[data-pay-panel]") || table.closest("section");
-      var objectID = table.getAttribute("data-object") ||
+    grids.forEach(function (grid) {
+      var panel = grid.closest("[data-pay-panel]") || grid.closest("section");
+      var objectID = grid.getAttribute("data-object") ||
         (panel ? panel.getAttribute("data-object") : "") || "";
       var paidOut = panel ? panel.querySelector("[data-pay-paid]") : null;
       var dueOut = panel ? panel.querySelector("[data-pay-due]") : null;
       var timers = {};
 
-      function cells(tr) { return qa("td.money-cell", tr); }
-
       function recalc() {
         var paid = 0, due = 0;
-        qa("tbody tr", table).forEach(function (tr) {
+        qa(".money-card", grid).forEach(function (card) {
           var sum = 0;
-          cells(tr).forEach(function (td) {
-            var input = q("input.num", td);
+          qa(".money-cell", card).forEach(function (cell) {
+            var input = q("input.num", cell);
             var v = input ? amount(input.value) : 0;
             sum += v;
-            if (q(".paycheck.is-paid", td)) { paid += v; } else { due += v; }
+            if (q(".paycheck.is-paid", cell)) { paid += v; } else { due += v; }
           });
-          var out = q("td.total", tr);
+          var out = q("[data-card-total]", card);
           if (out) out.textContent = dash(sum);
         });
         if (paidOut) paidOut.textContent = money(paid);
         if (dueOut) dueOut.textContent = money(due);
       }
 
-      function paint(td) {
-        var btn = q(".paycheck", td), input = q("input.num", td);
+      function paint(cell) {
+        var btn = q(".paycheck", cell), input = q("input.num", cell);
         if (!btn || !input) return;
         var v = amount(input.value);
         var paid = v > 0 && btn.classList.contains("is-paid");
@@ -725,8 +723,8 @@
         btn.setAttribute("title", label);
         var sr = q(".sr-only", btn);
         if (sr) sr.textContent = label;
-        td.classList.toggle("is-unpaid", v > 0 && !paid);
-        td.classList.toggle("is-paid", paid);
+        cell.classList.toggle("is-unpaid", v > 0 && !paid);
+        cell.classList.toggle("is-paid", paid);
         input.disabled = paid;
       }
 
@@ -762,25 +760,24 @@
           "|" + el.getAttribute("data-field");
       }
 
-      // Отметка оплаты: клик по галочке справа от суммы.
-      table.addEventListener("click", function (e) {
+      // Отметка оплаты: клик по галочке.
+      grid.addEventListener("click", function (e) {
         var btn = e.target.closest ? e.target.closest("button.paycheck") : null;
-        if (!btn || !table.contains(btn)) return;
-        var td = btn.closest(".money-cell");
-        var input = q("input.num", td);
+        if (!btn || !grid.contains(btn)) return;
+        var cell = btn.closest(".money-cell");
+        var input = q("input.num", cell);
         if (!input || amount(input.value) === 0) return;
         btn.classList.toggle("is-paid");
-        paint(td);
+        paint(cell);
         recalc();
         var field = input.getAttribute("data-field") === "advance" ? "advance_paid" : "paid";
         save(input, field, btn.classList.contains("is-paid") ? "1" : "");
       });
 
-      table.addEventListener("input", function (e) {
+      grid.addEventListener("input", function (e) {
         var input = e.target;
         if (!input.classList || !input.classList.contains("num")) return;
-        var td = input.closest(".money-cell");
-        paint(td);
+        paint(input.closest(".money-cell"));
         recalc();
         var key = keyOf(input);
         clearTimeout(timers[key]);
@@ -790,7 +787,7 @@
         }, 600);
       });
 
-      table.addEventListener("change", function (e) {
+      grid.addEventListener("change", function (e) {
         var input = e.target;
         if (!input.classList || !input.classList.contains("num")) return;
         var key = keyOf(input);

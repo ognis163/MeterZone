@@ -123,7 +123,7 @@ func TestJournalMoneyRespectsScope(t *testing.T) {
 		}
 	}
 
-	// scope → ожидаемый итог строки и число ячеек счетов в строке.
+	// scope → ожидаемый итог карточки месяца и число ячеек счетов в ней.
 	cases := map[string]struct {
 		total string
 		cells int
@@ -139,12 +139,12 @@ func TestJournalMoneyRespectsScope(t *testing.T) {
 			t.Fatalf("%s: код %d", scope, rr.Code)
 		}
 		body := rr.Body.String()
-		if !strings.Contains(body, `class="r mr total">`+want.total) {
-			t.Fatalf("%s: нет итога %q в строке месяца", scope, want.total)
+		if !strings.Contains(body, `data-card-total>`+want.total) {
+			t.Fatalf("%s: нет итога %q в карточке месяца", scope, want.total)
 		}
-		row := body[strings.Index(body, `data-row="2026-10"`):]
-		row = row[:strings.Index(row, "</tr>")]
-		if got := strings.Count(row, `class="money-cell`); got != want.cells {
+		card := body[strings.Index(body, `data-row="2026-10"`):]
+		card = card[:strings.Index(card, "</article>")]
+		if got := strings.Count(card, `class="money-cell`); got != want.cells {
 			t.Fatalf("%s: ячеек счетов %d, ожидалось %d", scope, got, want.cells)
 		}
 	}

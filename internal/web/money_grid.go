@@ -61,6 +61,8 @@ type moneyGrid struct {
 	AdvCols       []moneyGridCol
 	InvCols       []moneyGridCol
 	Rows          []moneyGridRow
+	Accounts      []moneyGridCol // счета в порядке показа
+	Cards         []moneyCard
 	AdvTotals     []string
 	InvTotals     []string
 	Total         float64
@@ -74,6 +76,37 @@ type moneyGrid struct {
 	StatementHref string
 }
 
+// moneyCard — месяц в виде карточки: три счёта, аванс и счёт в каждой строке.
+type moneyCard struct {
+	Label     string
+	Period    string
+	Current   bool
+	TotalText string
+	Lines     []moneyCardLine
+}
+
+// mergeAccountCols объединяет списки счетов аванса и счёта без повторов.
+func mergeAccountCols(lists ...[]moneyGridCol) []moneyGridCol {
+	seen := map[string]bool{}
+	var out []moneyGridCol
+	for _, list := range lists {
+		for _, c := range list {
+			if seen[c.Account] {
+				continue
+			}
+			seen[c.Account] = true
+			out = append(out, c)
+		}
+	}
+	return out
+}
+// moneyCardLine — строка счёта в карточке месяца.
+type moneyCardLine struct {
+	Short   string
+	Tone    string
+	Advance *moneyGridCell
+	Invoice *moneyGridCell
+}
 // moneyGridCellFrom собирает ячейку счёта за месяц.
 func moneyGridCellFrom(col moneyGridCol, p model.Period, field string, rec model.Record, paid bool, sum float64) moneyGridCell {
 	cell := moneyGridCell{
@@ -205,6 +238,37 @@ func (s *Server) buildMoneyGrid(obj model.Object, from, to model.Period,
 	}
 	grid.Total = model.Round2(grid.Total)
 	grid.TotalText = moneyOrDash(grid.Total)
+	// Карточки месяцев: строки по счетам, в каждой — аванс и счёт.
+	grid.Accounts = mergeAccountCols(grid.AdvCols, grid.InvCols)
+	for _, row := range grid.Rows {
+		card := moneyCard{
+			Label:     row.Label,
+			Period:    row.Period,
+			Current:   row.Current,
+			TotalText: row.TotalText,
+		}
+		adv := map[string]moneyGridCell{}
+		for _, c := range row.Advance {
+			adv[c.Account] = c
+		}
+		inv := map[string]moneyGridCell{}
+		for _, c := range row.Invoice {
+			inv[c.Account] = c
+		}
+		for _, acc := range grid.Accounts {
+			line := moneyCardLine{Short: acc.Short, Tone: acc.Tone}
+			if c, ok := adv[acc.Account]; ok {
+				cell := c
+				line.Advance = &cell
+			}
+			if c, ok := inv[acc.Account]; ok {
+				cell := c
+				line.Invoice = &cell
+			}
+			card.Lines = append(card.Lines, line)
+		}
+		grid.Cards = append(grid.Cards, card)
+	}
 	grid.PaidText = model.FormatMoney(grid.Paid)
 	grid.DueText = model.FormatMoney(grid.Due)
 	return grid

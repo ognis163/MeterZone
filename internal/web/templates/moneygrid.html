@@ -1,55 +1,40 @@
-{{/* ---------- начисления журнала: по колонке на каждый счёт ---------- */}}
+{{/* ---------- начисления журнала: карточка на каждый месяц ---------- */}}
 
-{{define "moneygridcell"}}
-<td class="money-cell tone-{{.Tone}}{{if .Unpaid}} is-unpaid{{end}}{{if .Paid}} is-paid{{end}}"
-    data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}">
-  <span class="val">
-    <input class="num" type="text" inputmode="decimal" autocomplete="off" value="{{.Value}}"{{if not .HasSum}} placeholder="—"{{end}}
-           aria-label="Сумма"{{if .Paid}} disabled{{end}}
-           data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}">
-    <button class="paycheck{{if .Paid}} is-paid{{end}}" type="button"
-            data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}"
-            aria-pressed="{{if .Paid}}true{{else}}false{{end}}" title="{{.StatusRu}}">
-      <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 6.5 4.5 9 10 3.5"/></svg>
-      <span class="sr-only">{{.StatusRu}}</span>
-    </button>
-  </span>
-</td>
+{{define "moneycell"}}
+{{if .}}
+<span class="money-cell tone-{{.Tone}}{{if .Unpaid}} is-unpaid{{end}}{{if .Paid}} is-paid{{end}}"
+      data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}">
+  <input class="num" type="text" inputmode="decimal" autocomplete="off" value="{{.Value}}"
+         {{- if not .HasSum}} placeholder="—"{{end}}
+         aria-label="Сумма"{{if .Paid}} disabled{{end}}
+         data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}">
+  <button class="paycheck{{if .Paid}} is-paid{{end}}" type="button"
+          data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}"
+          aria-pressed="{{if .Paid}}true{{else}}false{{end}}" title="{{.StatusRu}}">
+    <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2 6.5 4.5 9 10 3.5"/></svg>
+    <span class="sr-only">{{.StatusRu}}</span>
+  </button>
+</span>
+{{else}}<span class="money-cell is-off"></span>{{end}}
 {{end}}
 
 {{define "moneygrid"}}
-<div class="tbl sw">
-  <table class="pay grid" data-money-grid data-object="{{.Object.ID}}">
-    <thead>
-      <tr class="pay-groups">
-        <th rowspan="2" class="mc">Месяц</th>
-        {{if .AdvCols}}<th colspan="{{len .AdvCols}}" class="pay-group">Аванс</th>{{end}}
-        {{if .InvCols}}<th colspan="{{len .InvCols}}" class="pay-group">Счёт</th>{{end}}
-        <th rowspan="2" class="mr">Итого</th>
-      </tr>
-      <tr class="pay-sub">
-        {{range .AdvCols}}<th class="acc tone-{{.Tone}}" title="{{.Label}}"><cite>{{.Short}}</cite></th>{{end}}
-        {{range .InvCols}}<th class="acc tone-{{.Tone}}" title="{{.Label}}"><cite>{{.Short}}</cite></th>{{end}}
-      </tr>
-    </thead>
-    <tbody>
-      {{range .Rows}}
-      <tr data-row="{{.Period}}"{{if .Current}} class="cur"{{end}}>
-        <td class="m mc">{{.Label}}</td>
-        {{range .Advance}}{{template "moneygridcell" .}}{{end}}
-        {{range .Invoice}}{{template "moneygridcell" .}}{{end}}
-        <td class="r mr total">{{.TotalText}}</td>
-      </tr>
-      {{end}}
-    </tbody>
-    <tfoot>
-      <tr>
-        <td class="m mc">Итого</td>
-        {{range .AdvTotals}}<td class="r money-total">{{.}}</td>{{end}}
-        {{range .InvTotals}}<td class="r money-total">{{.}}</td>{{end}}
-        <td class="r mr total">{{.TotalText}}</td>
-      </tr>
-    </tfoot>
-  </table>
+<div class="money-cards" data-money-grid data-object="{{.Object.ID}}">
+  {{range .Cards}}
+  <article class="money-card{{if .Current}} is-current{{end}}" data-row="{{.Period}}">
+    <header class="money-card-head">
+      <span class="money-card-month">{{.Label}}</span>
+      <span class="money-card-total" data-card-total>{{.TotalText}}</span>
+    </header>
+    <div class="money-card-cols"><span></span><span>Аванс</span><span>Счёт</span></div>
+    {{range .Lines}}
+    <div class="money-line">
+      <span class="money-line-name tone-{{.Tone}}">{{.Short}}</span>
+      <span class="money-line-cell">{{template "moneycell" .Advance}}</span>
+      <span class="money-line-cell">{{template "moneycell" .Invoice}}</span>
+    </div>
+    {{end}}
+  </article>
+  {{end}}
 </div>
 {{end}}
