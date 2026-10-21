@@ -185,6 +185,10 @@ func (s *Store) migrate() error {
 		_, _ = tx.Exec(`ALTER TABLE money ADD COLUMN advance_paid INTEGER NOT NULL DEFAULT 0`)
 		_, _ = tx.Exec(`UPDATE money SET advance_paid = 1 WHERE advance > 0`)
 	}
+	// Нулевая сумма не может быть оплачена: раньше отметка «Итого»
+	// ставилась на всю строку, включая пустой аванс или счёт.
+	_, _ = tx.Exec(`UPDATE money SET advance_paid = 0 WHERE advance = 0`)
+	_, _ = tx.Exec(`UPDATE money SET paid_flag = 0 WHERE charged = 0`)
 	// Старые объекты, у которых уже есть начисления, оставляем с включённым финучётом.
 	_, _ = tx.Exec(`UPDATE objects SET finance_enabled = 1 WHERE id IN (SELECT DISTINCT object_id FROM money)`)
 	var version int

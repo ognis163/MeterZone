@@ -786,11 +786,12 @@ type journalPageData struct {
 	HasYear       bool
 	Resources     []model.Resource
 	JournalTable   journalTableData
-	MoneyBlocks    []moneyBlockView
+	MoneyTable     moneyTableView
 	MoneyPaid      string
 	MoneyDue       string
 	MoneyHref      string
 	MoneyAny       bool
+	MoneyEnabled   bool
 	MoneyFromLabel string
 	MoneyToLabel   string
 	MonthNav      monthNavView
@@ -998,10 +999,11 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 	data.HasMonths = monthsCount > 0
 
 	var paid, due float64
-	data.MoneyBlocks, paid, due = s.buildMoneyBlocks(obj, from, to, today, scope)
+	data.MoneyTable, paid, due = s.buildMoneyTable(obj, from, to, today, scope)
 	data.MoneyPaid = model.FormatMoney(paid)
 	data.MoneyDue = model.FormatMoney(due)
-	data.MoneyAny = len(data.MoneyBlocks) > 0
+	data.MoneyAny = len(data.MoneyTable.Months) > 0
+	data.MoneyEnabled = data.MoneyTable.Enabled
 	data.MoneyHref = reportPreviewHref(obj.ID, "charges", scope, to, from, to)
 	// Ссылки внутри журнала сохраняют объект, диапазон и фильтр.
 	hrefFor := func(f, t model.Period, sc string) string {

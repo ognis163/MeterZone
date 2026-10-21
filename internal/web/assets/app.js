@@ -716,7 +716,7 @@
         if (!btn) return st;
         btn.classList.toggle("is-paid", st.paid);
         btn.setAttribute("aria-pressed", st.paid ? "true" : "false");
-        btn.setAttribute("title", st.paid ? "Оплачено — снять отметку" : "Отметить оплату");
+        btn.setAttribute("title", st.paid ? "Оплачено — снять отметку" : "Отметить оплату целиком");
         var sum = q("[data-total]", btn);
         if (sum) sum.textContent = dash(st.total);
         var due = q("[data-due]", btn);
@@ -752,7 +752,21 @@
         var paid = v > 0 && cell.classList.contains("is-paid");
         cell.classList.toggle("is-paid", paid);
         cell.classList.toggle("is-unpaid", v > 0 && !paid);
+        cell.classList.toggle("is-empty", v === 0);
         input.disabled = paid;
+        paintTick(cell);
+      }
+
+      // Галочка внутри поля показывает и переключает оплату позиции.
+      function paintTick(cell) {
+        var tick = q(".tick", cell);
+        if (!tick) return;
+        var input = q("input.num", cell);
+        var name = input && input.getAttribute("data-field") === "advance" ? "Аванс" : "Счёт";
+        var paid = cell.classList.contains("is-paid");
+        tick.setAttribute("aria-pressed", paid ? "true" : "false");
+        tick.setAttribute("aria-label", name + (paid ? ": снять отметку" : ": отметить оплату"));
+        tick.setAttribute("title", paid ? "Оплачено — снять отметку" : "Отметить оплату");
       }
 
       function save(input, field, value) {
@@ -789,12 +803,31 @@
 
       function mark(row, paid) {
         cellsOf(row).forEach(function (cell) {
-          cell.classList.toggle("is-paid", paid);
-          cell.classList.toggle("is-unpaid", !paid && amount(q("input.num", cell).value) > 0);
           var input = q("input.num", cell);
-          if (input) input.disabled = paid && amount(input.value) > 0;
+          if (!input || amount(input.value) <= 0) return;
+          cell.classList.toggle("is-paid", paid);
+          cell.classList.toggle("is-unpaid", !paid);
+          input.disabled = paid;
+          paintTick(cell);
         });
       }
+
+      // Галочка в поле: оплата только этой позиции — аванса или счёта.
+      grid.addEventListener("click", function (e) {
+        var tick = e.target.closest ? e.target.closest(".tick") : null;
+        if (!tick || !grid.contains(tick)) return;
+        var cell = tick.closest(".money-cell");
+        var input = cell ? q("input.num", cell) : null;
+        if (!input || amount(input.value) <= 0) return;
+        var paid = !cell.classList.contains("is-paid");
+        cell.classList.toggle("is-paid", paid);
+        cell.classList.toggle("is-unpaid", !paid);
+        input.disabled = paid;
+        paintTick(cell);
+        var field = input.getAttribute("data-field") === "advance" ? "advance_paid" : "paid";
+        save(input, field, paid ? "1" : "");
+        recalc();
+      });
 
       // Клик по «Итого»: отметить строку оплаченной или снять отметку.
       grid.addEventListener("click", function (e) {
@@ -809,7 +842,7 @@
         recalc();
         cellsOf(row).forEach(function (cell) {
           var input = q("input.num", cell);
-          if (!input) return;
+          if (!input || amount(input.value) <= 0) return;
           var field = input.getAttribute("data-field") === "advance" ? "advance_paid" : "paid";
           save(input, field, now ? "1" : "");
         });

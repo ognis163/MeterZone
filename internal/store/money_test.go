@@ -98,6 +98,42 @@ func TestMigrationMoneyAdvance(t *testing.T) {
 		t.Fatalf("электро после миграции: %+v", energy)
 	}
 }
+
+// TestMigrationClearsPaidOnEmptyMoney — нулевая сумма не может быть
+// оплачена: старые отметки на пустых позициях снимаются при открытии.
+func TestMigrationClearsPaidOnEmptyMoney(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.db")
+	st, err := Open(path, time.Local)
+	if err != nil {
+		t.Fatal(err)
+	}
+	obj := model.Object{Name: "Дом"}
+	if err := st.SaveObject(&obj); err != nil {
+		t.Fatal(err)
+	}
+	// Такую запись оставляла прежняя отметка «Итого»: пустая позиция оплачена.
+	if _, err := st.DB().Exec(`INSERT INTO money (object_id, period, account, charged, paid, advance, advance_paid, paid_flag, note, updated_at)
+		VALUES (?, '2026-10', 'energy', 0, 0, 0, 1, 1, '', '2026-10-01T00:00:00Z')`, obj.ID); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+
+	again, err := Open(path, time.Local)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer again.Close()
+	got, err := again.MoneyForMonth(obj.ID, "2026-10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := got[model.AccountEnergy]
+	if m.PaidFlag || m.AdvancePaid {
+		t.Fatalf("оплата пустой позиции осталась: %+v", m)
+	}
+}
+
 func TestAvailableMonths(t *testing.T) {
 	st := newStore(t)
 	obj := model.Object{Name: "Дом"}

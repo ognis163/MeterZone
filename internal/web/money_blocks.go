@@ -4,9 +4,9 @@ import (
 	"indextro/internal/model"
 )
 
-// Начисления в журнале разбиты на два блока, как плитки показаний на главной:
-// «Электроэнергия» и «Водоснабжение». Внутри — месяц, аванс, счёт и итого.
-// Блок появляется, только если у прибора включён финансовый учёт.
+// Начисления в журнале — одна таблица на все ресурсы: месяц, ресурс,
+// аванс, счёт и итого. Аванс и счёт можно отметить оплаченными по
+// отдельности, а «Итого» отмечает сразу обе позиции строки.
 
 // moneyGridCell — позиция строки: сумма и отметка оплаты одного счёта за месяц.
 type moneyGridCell struct {
@@ -32,17 +32,16 @@ func (c moneyGridCell) sum() float64 {
 	}
 	return model.Round2(v)
 }
-// moneyBlockView — блок начислений одного вида: электро или вода.
-type moneyBlockView struct {
-	Title       string
-	IsWater     bool
-	ShowAdvance bool
-	ShowInvoice bool
+
+// moneyTableView — таблица начислений за выбранный период.
+type moneyTableView struct {
 	Months      []moneyMonthView
-	HasAny      bool
+	ShowAdvance bool // есть хотя бы один счёт с авансом
+	ShowInvoice bool // есть хотя бы один счёт со счётом
+	Enabled     bool // финучёт включён хотя бы у одного прибора
 }
 
-// moneyMonthView — месяц в блоке; у воды в нём две строки: холодная и горячая.
+// moneyMonthView — месяц: подпись слева и строка на каждый ресурс.
 type moneyMonthView struct {
 	Label   string
 	Period  string
@@ -52,21 +51,24 @@ type moneyMonthView struct {
 
 // moneyLineView — строка счёта за месяц.
 type moneyLineView struct {
-	Label     string // «Холодная» / «Горячая»; у электро пусто
-	Account   string
-	Advance   *moneyGridCell
-	Invoice   *moneyGridCell
-	Total     float64
-	TotalText string
-	HasDue    bool
-	Due       float64
-	DueText   string
-	Paid      bool // оплачены все позиции строки
+	Label       string // «Холодная вода»
+	Short       string // «ХВС» — для узких экранов
+	Account     string
+	ShowAdvance bool
+	ShowInvoice bool
+	Advance     *moneyGridCell
+	Invoice     *moneyGridCell
+	Total       float64
+	TotalText   string
+	HasDue      bool
+	Due         float64
+	DueText     string
+	Paid        bool // оплачены все позиции строки
 }
 
-// buildMoneyBlocks собирает блоки начислений за период.
-func (s *Server) buildMoneyBlocks(obj model.Object, from, to model.Period,
-	today model.Period, scope string) (blocks []moneyBlockView, paid, due float64) {
+// buildMoneyTable собирает таблицу начислений за период.
+func (s *Server) buildMoneyTable(obj model.Object, from, to model.Period,
+	today model.Period, scope string) (table moneyTableView, paid, due float64) {
 
 	stored, _ := s.Store.MoneyGridIn(obj.ID, from, to)
 	meters, _ := s.Store.Meters(obj.ID, true)
@@ -88,106 +90,78 @@ func (s *Server) buildMoneyBlocks(obj model.Object, from, to model.Period,
 		}
 	}
 
-	// Электроэнергия идёт первой, вода — ниже.
-	type blockSpec struct {
-		title   string
-		isWater bool
-		account model.Account
-		line    string
+	accounts := make([]model.Account, 0, len(model.AccountOrder))
+	for _, acc := range model.AccountOrder {
+		if !on[acc] {
+			continue
+		}
+		table.Enabled = true
+		if !moneyAccountInScope(acc, scope) {
+			continue
+		}
+		accounts = append(accounts, acc)
+		table.ShowAdvance = table.ShowAdvance || advOn[acc]
+		table.ShowInvoice = table.ShowInvoice || invOn[acc]
 	}
-	specs := []blockSpec{}
-	if scope != "water" {
-		specs = append(specs, blockSpec{"Электроэнергия", false, model.AccountEnergy, ""})
-	}
-	if scope != "energy" {
-		specs = append(specs, blockSpec{"Водоснабжение", true, model.AccountWaterCold, "Холодная"})
-		specs = append(specs, blockSpec{"Водоснабжение", true, model.AccountWaterHot, "Горячая"})
+	if len(accounts) == 0 {
+		return table, 0, 0
 	}
 
-	grouped := map[bool]*moneyBlockView{}
-	for _, sp := range specs {
-		if !on[sp.account] {
-			continue // в приборе не включён финансовый учёт
+	for p := from; !p.After(to); p = p.Next() {
+		month := moneyMonthView{
+			Label:   p.Label(),
+			Period:  p.String(),
+			Current: p == today,
 		}
-		blk := grouped[sp.isWater]
-		if blk == nil {
-			blk = &moneyBlockView{Title: sp.title, IsWater: sp.isWater}
-			grouped[sp.isWater] = blk
-		}
-		if advOn[sp.account] {
-			blk.ShowAdvance = true
-		}
-		if invOn[sp.account] {
-			blk.ShowInvoice = true
-		}
-	}
-
-	if e := grouped[false]; e != nil {
-		blocks = append(blocks, *e)
-	}
-	if w := grouped[true]; w != nil {
-		blocks = append(blocks, *w)
-	}
-
-	// Месяцы в каждом блоке.
-	for bi := range blocks {
-		blk := &blocks[bi]
-		accounts := []model.Account{model.AccountEnergy}
-		if blk.IsWater {
-			accounts = []model.Account{model.AccountWaterCold, model.AccountWaterHot}
-		}
-		for p := from; !p.After(to); p = p.Next() {
-			month := moneyMonthView{Label: p.Label(), Period: p.String(), Current: p == today}
-			for _, acc := range accounts {
-				if !on[acc] {
-					continue
-				}
-				rec := stored[p.String()][acc]
-				line := moneyLineView{Account: string(acc), Label: accountLineLabel(acc)}
-				if blk.ShowAdvance && advOn[acc] {
-					cell := moneyCellFor(acc, p, "advance", rec.AdvanceSum, rec.AdvancePaid)
-					line.Advance = &cell
-					line.Total += cell.sum()
-					if !cell.Paid && cell.HasSum {
-						line.Due += cell.sum()
-					}
-				}
-				if blk.ShowInvoice && invOn[acc] {
-					cell := moneyCellFor(acc, p, "charged", rec.InvoiceSum, rec.InvoicePaid)
-					line.Invoice = &cell
-					line.Total += cell.sum()
-					if !cell.Paid && cell.HasSum {
-						line.Due += cell.sum()
-					}
-				}
-				line.Total = model.Round2(line.Total)
-				line.Due = model.Round2(line.Due)
-				line.TotalText = moneyOrDash(line.Total)
-				line.DueText = model.FormatMoney(line.Due)
-				line.HasDue = line.Due > 0
-				line.Paid = line.Total > 0 && line.Due == 0
-				if line.Total > 0 {
-					blk.HasAny = true
-				}
-				paid += line.Total - line.Due
-				due += line.Due
-				month.Lines = append(month.Lines, line)
+		for _, acc := range accounts {
+			rec := stored[p.String()][acc]
+			line := moneyLineView{
+				Label:       acc.Label(),
+				Short:       acc.Short(),
+				Account:     string(acc),
+				ShowAdvance: advOn[acc],
+				ShowInvoice: invOn[acc],
 			}
-			blk.Months = append(blk.Months, month)
+			if line.ShowAdvance {
+				cell := moneyCellFor(acc, p, "advance", rec.AdvanceSum, rec.AdvancePaid)
+				line.Advance = &cell
+				line.Total += cell.sum()
+				if !cell.Paid && cell.HasSum {
+					line.Due += cell.sum()
+				}
+			}
+			if line.ShowInvoice {
+				cell := moneyCellFor(acc, p, "charged", rec.InvoiceSum, rec.InvoicePaid)
+				line.Invoice = &cell
+				line.Total += cell.sum()
+				if !cell.Paid && cell.HasSum {
+					line.Due += cell.sum()
+				}
+			}
+			line.Total = model.Round2(line.Total)
+			line.Due = model.Round2(line.Due)
+			line.TotalText = moneyOrDash(line.Total)
+			line.DueText = model.FormatMoney(line.Due)
+			line.HasDue = line.Due > 0
+			line.Paid = line.Total > 0 && line.Due == 0
+			paid += line.Total - line.Due
+			due += line.Due
+			month.Lines = append(month.Lines, line)
 		}
+		table.Months = append(table.Months, month)
 	}
-	return blocks, model.Round2(paid), model.Round2(due)
+	return table, model.Round2(paid), model.Round2(due)
 }
 
-// accountLineLabel — подпись строки счёта в блоке воды.
-func accountLineLabel(acc model.Account) string {
-	switch acc {
-	case model.AccountWaterCold:
-		return "Холодная"
-	case model.AccountWaterHot:
-		return "Горячая"
+// moneyAccountInScope — входит ли счёт в фильтр «Что включить».
+func moneyAccountInScope(acc model.Account, scope string) bool {
+	switch scope {
+	case "water":
+		return acc == model.AccountWaterCold || acc == model.AccountWaterHot
+	case "energy":
+		return acc == model.AccountEnergy
 	}
-	return ""
+	return true
 }
 
 // moneyCellFor собирает ячейку позиции: сумму, оплату и оформление.

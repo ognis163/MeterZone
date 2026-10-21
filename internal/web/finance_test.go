@@ -107,8 +107,8 @@ func TestRecordTotals(t *testing.T) {
 	}
 }
 
-// TestJournalMoneyRespectsScope — блок «Начисления» в журнале суммирует
-// только те счета, которые выбраны фильтром «Что включить».
+// TestJournalMoneyRespectsScope — таблица «Начисления» в журнале
+// показывает только те счета, которые выбраны фильтром «Что включить».
 func TestJournalMoneyRespectsScope(t *testing.T) {
 	_, st, h := newTestServer(t)
 	period := "2026-10"
@@ -123,15 +123,27 @@ func TestJournalMoneyRespectsScope(t *testing.T) {
 		}
 	}
 
-	// scope → блоки и суммы строк за месяц.
+	// scope → строки ресурсов и суммы за месяц.
 	type want struct {
-		blocks []string
+		labels []string
+		absent []string
 		totals []string
 	}
 	cases := map[string]want{
-		"all":    {[]string{"Электроэнергия", "Водоснабжение"}, []string{"3 000 ₽", "1 000 ₽", "500 ₽"}},
-		"water":  {[]string{"Водоснабжение"}, []string{"1 000 ₽", "500 ₽"}},
-		"energy": {[]string{"Электроэнергия"}, []string{"3 000 ₽"}},
+		"all": {
+			labels: []string{"Холодная вода", "Горячая вода", "Электроэнергия"},
+			totals: []string{"3 000 ₽", "1 000 ₽", "500 ₽"},
+		},
+		"water": {
+			labels: []string{"Холодная вода", "Горячая вода"},
+			absent: []string{"Электроэнергия"},
+			totals: []string{"1 000 ₽", "500 ₽"},
+		},
+		"energy": {
+			labels: []string{"Электроэнергия"},
+			absent: []string{"Холодная вода", "Горячая вода"},
+			totals: []string{"3 000 ₽"},
+		},
 	}
 	for scope, w := range cases {
 		rr := request(t, h, http.MethodGet,
@@ -140,9 +152,17 @@ func TestJournalMoneyRespectsScope(t *testing.T) {
 			t.Fatalf("%s: код %d", scope, rr.Code)
 		}
 		body := rr.Body.String()
-		for _, b := range w.blocks {
-			if !strings.Contains(body, ">"+b+"</b>") {
-				t.Fatalf("%s: нет блока %q", scope, b)
+		if !strings.Contains(body, `class="money-table"`) {
+			t.Fatalf("%s: нет таблицы начислений", scope)
+		}
+		for _, label := range w.labels {
+			if !strings.Contains(body, ">"+label+"</span>") {
+				t.Fatalf("%s: нет строки %q", scope, label)
+			}
+		}
+		for _, label := range w.absent {
+			if strings.Contains(body, ">"+label+"</span>") {
+				t.Fatalf("%s: лишняя строка %q", scope, label)
 			}
 		}
 		for _, sum := range w.totals {
@@ -153,7 +173,35 @@ func TestJournalMoneyRespectsScope(t *testing.T) {
 	}
 }
 
-// TestJournalMoneyHiddenWithoutFinance — блоки начислений не показываются,
+// TestJournalMoneyMarksPositionsSeparately — аванс и счёт отмечаются
+// оплаченными по отдельности, а «Итого» показывает остаток.
+func TestJournalMoneyMarksPositionsSeparately(t *testing.T) {
+	_, st, h := newTestServer(t)
+	period := "2026-10"
+	if err := st.SaveMoney([]model.Money{{
+		ObjectID: 1, Period: period, Account: model.AccountEnergy,
+		Charged: 3000, AdvanceSum: 1000, AdvancePaid: true,
+	}}, period); err != nil {
+		t.Fatal(err)
+	}
+	rr := request(t, h, http.MethodGet,
+		"/journal?object=1&from=2026-10&to=2026-10&scope=energy", nil, "")
+	if rr.Code != http.StatusOK {
+		t.Fatalf("код %d", rr.Code)
+	}
+	body := rr.Body.String()
+	if got := strings.Count(body, "money-cell is-paid"); got != 1 {
+		t.Fatalf("оплаченных позиций %d, ожидалась 1", got)
+	}
+	if got := strings.Count(body, "money-cell is-unpaid"); got != 1 {
+		t.Fatalf("неоплаченных позиций %d, ожидалась 1", got)
+	}
+	if !strings.Contains(body, "к оплате 3 000 ₽") {
+		t.Fatal("нет остатка к оплате по счёту")
+	}
+}
+
+// TestJournalMoneyHiddenWithoutFinance — таблица начислений не показывается,
 // если ни у одного прибора не включён финансовый учёт.
 func TestJournalMoneyHiddenWithoutFinance(t *testing.T) {
 	_, st, h := newTestServer(t)
@@ -174,8 +222,8 @@ func TestJournalMoneyHiddenWithoutFinance(t *testing.T) {
 		t.Fatalf("код %d", rr.Code)
 	}
 	body := rr.Body.String()
-	if strings.Contains(body, ">Электроэнергия</b>") || strings.Contains(body, ">Водоснабжение</b>") {
-		t.Fatal("блоки начислений показаны без финансового учёта")
+	if strings.Contains(body, `class="money-table"`) {
+		t.Fatal("таблица начислений показана без финансового учёта")
 	}
 	if !strings.Contains(body, "Финансовый учёт не включён") {
 		t.Fatal("нет подсказки про финансовый учёт")

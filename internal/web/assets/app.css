@@ -2488,7 +2488,7 @@ html, body { overscroll-behavior-x: none; }
 
 @media (max-width: 759px) {
   .jrange-custom {
-    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     grid-template-areas: "from dash to" "btn btn btn";
     gap: 8px; width: 100%;
   }
@@ -2534,97 +2534,156 @@ html, body { overscroll-behavior-x: none; }
 .pay[data-pay-edit="0"] .st { cursor: default; }
 .jcount { font-weight: 400; }
 /* ==========================================================================
-/* ==========================================================================
-   Начисления в журнале: два блока — «Электроэнергия» и «Водоснабжение».
-   Месяц, аванс, счёт, итого. Оплачено — итого зелёным, долг — красным.
+   Начисления в журнале: одна таблица на все ресурсы.
+   Строка — месяц и ресурс; аванс и счёт — невысокие поля с галочкой
+   оплаты, «Итого» отмечает обе позиции сразу.
    ========================================================================== */
 
-.money-blocks { display: grid; gap: 14px; }
+.money-panel { --money-due: #a8392a; }
+:root[data-theme="dark"] .money-panel { --money-due: #ff9a80; }
 
-.money-block {
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 12px 16px 6px;
-  background: var(--surface);
-  min-width: 0;
+.money-wrap { min-width: 0; }
+
+.money-scroll {
+  margin: 2px 0 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
-.money-block-head {
-  display: flex; align-items: center; gap: 8px;
-  padding-bottom: 8px; margin-bottom: 2px;
+table.money-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+table.money-table th {
+  padding: 4px 8px 6px;
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--faint); font-weight: 700; text-align: right; white-space: nowrap;
   border-bottom: 1px solid var(--line);
 }
-.money-block-head .ico { width: 18px; height: 18px; color: var(--accent); flex: none; }
-.money-block-head b { font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+table.money-table th.m { text-align: left; }
+table.money-table td { padding: 0 8px; text-align: right; vertical-align: middle; }
+table.money-table td.m { text-align: left; }
 
-table.money-simple { border-collapse: collapse; width: 100%; }
-table.money-simple th {
-  font-size: 10px; text-transform: uppercase; letter-spacing: .07em;
-  color: var(--faint); font-weight: 600;
-  text-align: right; padding: 9px 8px 7px;
+.money-table .c-month { width: 17%; }
+.money-table .c-res { width: 21%; }
+.money-table .c-adv, .money-table .c-inv { width: 20%; }
+.money-table .c-total { width: 22%; }
+
+/* Месяц и ресурс — подписи слева. На телефоне месяц становится
+   заголовком группы, а колонка «Месяц» скрывается. */
+.money-table td.month {
+  padding-top: 4px; padding-bottom: 4px;
+  font-size: 12.5px; font-weight: 650; color: var(--ink);
+  white-space: nowrap; vertical-align: top;
 }
-table.money-simple th.m { text-align: left; }
-table.money-simple td { padding: 2px 8px; text-align: right; vertical-align: middle; }
-table.money-simple td.m { text-align: left; }
-table.money-simple tbody tr { border-top: 1px solid var(--line); }
-table.money-simple tbody tr:first-child { border-top: 0; }
-
-table.money-simple td.month {
-  font-size: 13.5px; font-weight: 600; white-space: nowrap;
-  vertical-align: top; padding-top: 7px; width: 100%;
+.money-table tr.money-month-row { display: none; }
+.money-table td.res {
+  font-size: 11.5px; color: var(--muted);
+  white-space: nowrap; text-align: left;
 }
-table.money-simple td.pos, table.money-simple th + th { width: 150px; }
-table.money-simple th:last-child, table.money-simple td.total-cell { width: 150px; }
-table.money-simple td.month-pair { width: 190px; }
-table.money-simple td.line-name { font-size: 12px; color: var(--muted); white-space: nowrap; width: 110px; vertical-align: top; padding-top: 7px; }
+.money-table td.res .r-short { display: none; }
 
-/* Позиция: поле с рамкой и галочка оплаты внутри справа. */
+/* Группа месяца: линия только между месяцами, внутри — без рамок. */
+.money-table tbody tr.money-line-row.is-first { border-top: 1px solid var(--line); }
+.money-table tbody tr.money-line-row:first-child { border-top: 0; }
+.money-table tbody tr.is-current td.month { box-shadow: inset 2px 0 0 var(--accent); }
+
+/* Позиция: невысокое поле и галочка оплаты внутри справа. */
 .money-cell {
-  display: inline-flex; align-items: center; justify-content: flex-end;
-  gap: 6px; min-width: 0;
+  position: relative; display: block;
+  width: 100%; max-width: 94px; margin-left: auto;
 }
 .money-cell .num {
-  width: 100px; height: 28px; padding: 0 9px;
-  border: 1px solid var(--line-strong); border-radius: 9px;
+  width: 100%; min-height: 0; height: 25px;
+  padding: 0 23px 0 7px;
+  border: 1px solid var(--line); border-radius: 7px;
   background: var(--surface); color: var(--ink);
-  font: inherit; font-size: 13.5px; text-align: right;
+  font: inherit; font-size: 12.5px; line-height: 23px; text-align: right;
   font-variant-numeric: tabular-nums;
 }
 .money-cell .num::placeholder { color: var(--faint); }
 .money-cell .num:hover { border-color: var(--line-strong); }
+/* Пустая позиция не рисуется рамкой: видно только прочерк. */
+.money-cell.is-empty .num { border-color: transparent; background: transparent; }
+.money-cell.is-empty .num:hover,
+.money-cell.is-empty .num:focus { border-color: var(--line-strong); background: var(--surface); }
 .money-cell .num:focus {
   outline: none; border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .money-cell .num:disabled {
   background: var(--surface-2); border-color: var(--line);
-  color: var(--muted); -webkit-text-fill-color: var(--muted);
+  color: var(--ink-2); -webkit-text-fill-color: var(--ink-2);
 }
 
-/* Галочка: видна у оплаченного, у неоплаченного — по наведению. */
-.money-cell .tick { width: 13px; height: 13px; flex: none; color: var(--ok); opacity: 0; }
-.money-cell.is-paid .tick { opacity: 1; }
-.money-cell:hover .tick { opacity: .45; }
-.money-cell.is-paid:hover .tick { opacity: 1; }
-@media (hover: none) { .money-cell .tick { opacity: .4; } .money-cell.is-paid .tick { opacity: 1; } }
+/* Кружок оплаты: пустой — не оплачено, зелёный с галочкой — оплачено. */
+.money-cell .tick {
+  position: absolute; right: 3px; top: 50%; transform: translateY(-50%);
+  display: grid; place-items: center;
+  width: 17px; height: 17px; padding: 0;
+  border: 1.5px solid var(--line-strong); border-radius: 50%;
+  background: var(--surface); color: transparent;
+  cursor: pointer;
+}
+.money-cell .tick svg { width: 11px; height: 11px; }
+.money-cell .tick::before { content: ""; position: absolute; inset: -5px; border-radius: 50%; }
+.money-cell .tick:hover { border-color: var(--ok); }
+.money-cell .tick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.money-cell.is-paid .tick {
+  border-color: var(--ok); background: var(--ok); color: var(--surface);
+}
+.money-cell.is-paid .tick:hover { background: color-mix(in srgb, var(--ok) 82%, #000); }
+.money-cell.is-empty .tick { display: none; }
 
-/* Итог строки — кнопка отметки оплаты. */
+.money-void { display: inline-block; padding-right: 23px; color: var(--faint); }
+
+/* Итог строки — кнопка, отмечает оплату обеих позиций. */
 td.total-cell { white-space: nowrap; }
 .total-toggle {
   display: inline-flex; flex-direction: column; align-items: flex-end; gap: 1px;
-  padding: 4px 8px; margin: -4px -8px;
+  padding: 3px 7px; margin: -3px -7px;
   border: 0; border-radius: 8px; background: none;
   font: inherit; color: inherit; cursor: pointer; text-align: right;
 }
 .total-toggle:hover { background: var(--surface-2); }
+.total-toggle:hover .total-sum { text-decoration: underline dotted; text-underline-offset: 3px; }
 .total-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.total-sum { font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.total-sum { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .total-toggle.is-paid .total-sum { color: var(--ok); }
-.total-due { font-size: 11px; color: #a8392a; font-variant-numeric: tabular-nums; }
-:root[data-theme="dark"] .total-due { color: #ff9a80; }
+.total-due { font-size: 10.5px; color: var(--money-due); font-variant-numeric: tabular-nums; }
 
 @media (max-width: 759px) {
-  .money-block { padding: 10px 12px 4px; }
-  .money-cell .num { width: 84px; height: 32px; padding: 0 8px; }
-  table.money-simple th, table.money-simple td { padding-left: 5px; padding-right: 5px; }
+  .money-panel { padding: 16px 12px; }
+  table.money-table th { padding: 4px 4px 6px; }
+  table.money-table td { padding: 0 4px; }
+  .money-table .c-res { width: 20%; }
+  .money-table .c-adv, .money-table .c-inv { width: 26%; }
+  .money-table .c-total { width: 28%; }
+  .money-table th.c-month, .money-table td.month { display: none; }
+  .money-table tr.money-month-row { display: table-row; }
+  .money-table tr.money-month-row td {
+    padding: 11px 4px 3px;
+    border-top: 1px solid var(--line);
+    font-size: 12px; font-weight: 650; text-align: left; color: var(--ink);
+  }
+  .money-table tr.money-month-row:first-child td { border-top: 0; padding-top: 2px; }
+  .money-table tr.money-month-row.is-current td { box-shadow: inset 2px 0 0 var(--accent); }
+  .money-table tbody tr.money-line-row.is-first { border-top: 0; }
+  .money-table td.res { font-size: 11px; }
+  .money-table td.res .r-full { display: none; }
+  .money-table td.res .r-short { display: inline; }
+  .money-cell { max-width: none; }
+  .money-cell .num { height: 26px; font-size: 11.5px; line-height: 24px; padding: 0 22px 0 5px; }
+  .money-cell .tick { right: 2px; width: 16px; height: 16px; }
+  .money-cell .tick svg { width: 10px; height: 10px; }
+  .money-void { padding-right: 18px; }
+  .total-sum { font-size: 12px; }
+  .total-due { font-size: 9.5px; }
+  .total-toggle { padding: 3px 4px; margin: -3px -4px; }
+  .money-panel .section-head { display: grid; gap: 7px; }
+  .money-panel .section-head-side { width: 100%; justify-content: space-between; }
+  .money-panel .section-head-side .sum { flex-wrap: wrap; }
 }

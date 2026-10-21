@@ -1,60 +1,67 @@
-{{/* ---------- начисления: блок «Электроэнергия» и блок «Водоснабжение» ---------- */}}
+{{/* ---------- начисления: одна таблица на все ресурсы ---------- */}}
 
-{{define "moneyblock"}}
-<section class="money-block">
-  <div class="money-block-head">
-    {{if .IsWater}}{{template "icon-drop"}}{{else}}{{template "icon-bolt"}}{{end}}
-    <b>{{.Title}}</b>
-  </div>
-  <table class="money-simple">
+{{/* Позиция строки: поле суммы и отметка оплаты. Галочка отмечает
+     именно эту позицию — аванс или счёт отдельно. */}}
+{{define "moneycell"}}
+<span class="money-cell{{if .Unpaid}} is-unpaid{{end}}{{if .Paid}} is-paid{{end}}{{if not .HasSum}} is-empty{{end}}">
+  <input class="num" type="text" inputmode="decimal" autocomplete="off" value="{{.Value}}"
+         {{- if not .HasSum}} placeholder="—"{{end}}
+         aria-label="{{if eq .Field "advance"}}Аванс{{else}}Счёт{{end}}"{{if .Paid}} disabled{{end}}
+         data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}">
+  <button class="tick" type="button"
+          aria-label="{{if eq .Field "advance"}}Аванс{{else}}Счёт{{end}}: {{if .Paid}}снять отметку{{else}}отметить оплату{{end}}"
+          aria-pressed="{{if .Paid}}true{{else}}false{{end}}"
+          title="{{if .Paid}}Оплачено — снять отметку{{else}}Отметить оплату{{end}}">
+    <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 6.5 4.5 9 10 3.5"/></svg>
+  </button>
+</span>
+{{end}}
+
+{{define "moneytable"}}
+{{$cols := 2}}{{if .ShowAdvance}}{{$cols = add $cols 1}}{{end}}{{if .ShowInvoice}}{{$cols = add $cols 1}}{{end}}
+<div class="money-scroll">
+  <table class="money-table">
     <thead>
       <tr>
-        <th class="m">Месяц</th>
-        {{if .IsWater}}<th class="m"></th>{{end}}
-        {{if .ShowAdvance}}<th>Аванс</th>{{end}}
-        {{if .ShowInvoice}}<th>Счёт</th>{{end}}
-        <th>Итого</th>
+        <th class="m c-month">Месяц</th>
+        <th class="m c-res">Ресурс</th>
+        {{if .ShowAdvance}}<th class="num c-adv">Аванс</th>{{end}}
+        {{if .ShowInvoice}}<th class="num c-inv">Счёт</th>{{end}}
+        <th class="num c-total">Итого</th>
       </tr>
     </thead>
     <tbody>
       {{range .Months}}
-      {{$month := .}}
-      {{$n := len .Lines}}
+      {{$m := .}}
+      <tr class="money-month-row{{if $m.Current}} is-current{{end}}">
+        <td colspan="{{$cols}}">{{$m.Label}}</td>
+      </tr>
       {{range $i, $line := .Lines}}
-      <tr class="money-line-row" data-row="{{$month.Period}}" data-account="{{$line.Account}}">
-        {{if eq $i 0}}<td class="m month{{if $.IsWater}} month-pair{{end}}" rowspan="{{$n}}">{{$month.Label}}</td>{{end}}
-        {{if $.IsWater}}<td class="m line-name">{{$line.Label}}</td>{{end}}
-        {{with $line.Advance}}
-        <td class="pos">
-          <span class="money-cell{{if .Unpaid}} is-unpaid{{end}}{{if .Paid}} is-paid{{end}}"
-                data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}">
-            <input class="num" type="text" inputmode="decimal" autocomplete="off" value="{{.Value}}"
-                   {{- if not .HasSum}} placeholder="—"{{end}}
-                   aria-label="Аванс"{{if .Paid}} disabled{{end}}
-                   data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}">
-            <svg class="tick" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 6.5 4.5 9 10 3.5"/></svg>
-          </span>
+      <tr class="money-line-row{{if eq $i 0}} is-first{{end}}{{if $m.Current}} is-current{{end}}"
+          data-row="{{$m.Period}}" data-account="{{$line.Account}}">
+        {{if eq $i 0}}
+        <td class="m c-month month" rowspan="{{len $m.Lines}}">{{$m.Label}}</td>
+        {{end}}
+        <td class="m c-res res">
+          <span class="r-full">{{$line.Label}}</span><span class="r-short">{{$line.Short}}</span>
+        </td>
+        {{if $.ShowAdvance}}
+        <td class="pos c-adv">
+          {{with $line.Advance}}{{template "moneycell" .}}{{else}}<span class="money-void" aria-hidden="true">—</span>{{end}}
         </td>
         {{end}}
-        {{with $line.Invoice}}
-        <td class="pos">
-          <span class="money-cell{{if .Unpaid}} is-unpaid{{end}}{{if .Paid}} is-paid{{end}}"
-                data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}">
-            <input class="num" type="text" inputmode="decimal" autocomplete="off" value="{{.Value}}"
-                   {{- if not .HasSum}} placeholder="—"{{end}}
-                   aria-label="Счёт"{{if .Paid}} disabled{{end}}
-                   data-account="{{.Account}}" data-field="{{.Field}}" data-p="{{.Period}}">
-            <svg class="tick" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 6.5 4.5 9 10 3.5"/></svg>
-          </span>
+        {{if $.ShowInvoice}}
+        <td class="pos c-inv">
+          {{with $line.Invoice}}{{template "moneycell" .}}{{else}}<span class="money-void" aria-hidden="true">—</span>{{end}}
         </td>
         {{end}}
-        <td class="total-cell">
+        <td class="total-cell c-total">
           <button class="total-toggle{{if $line.Paid}} is-paid{{end}}" type="button"
-                  data-total-account="{{$line.Account}}" data-p="{{$month.Period}}"
+                  data-total-account="{{$line.Account}}" data-p="{{$m.Period}}"
                   aria-pressed="{{if $line.Paid}}true{{else}}false{{end}}"
-                  title="{{if $line.Paid}}Оплачено — снять отметку{{else}}Отметить оплату{{end}}">
+                  title="{{if $line.Paid}}Оплачено — снять отметку{{else}}Отметить оплату целиком{{end}}">
             <span class="total-sum" data-total>{{$line.TotalText}}</span>
-            {{if and $line.HasDue}}<span class="total-due" data-due>к оплате {{$line.DueText}}</span>{{end}}
+            {{if $line.HasDue}}<span class="total-due" data-due>к оплате {{$line.DueText}}</span>{{end}}
           </button>
         </td>
       </tr>
@@ -62,11 +69,5 @@
       {{end}}
     </tbody>
   </table>
-</section>
-{{end}}
-
-{{define "moneygrid"}}
-<div class="money-blocks" data-money-grid data-object="{{.Object.ID}}">
-  {{range .MoneyBlocks}}{{template "moneyblock" .}}{{end}}
 </div>
 {{end}}
