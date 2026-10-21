@@ -672,8 +672,8 @@
 
   // --------------------------------------------------------------------
   // --------------------------------------------------------------------
-  // Начисления в журнале: карточка на месяц, в ней счета с авансом и счётом.
-  // Сумма и отметка оплаты сохраняются сразу, итоги пересчитываются на месте.
+  // Начисления в журнале: блоки «Электроэнергия» и «Водоснабжение».
+  // Суммы сохраняются сами; клик по «Итого» отмечает строку оплаченной.
   // --------------------------------------------------------------------
   (function () {
     var grids = qa("[data-money-grid]");
@@ -695,36 +695,63 @@
       var dueOut = panel ? panel.querySelector("[data-pay-due]") : null;
       var timers = {};
 
+      function rows() { return qa("tr.money-line-row", grid); }
+      function cellsOf(row) { return qa(".money-cell", row); }
+
+      // Оплата строки: все позиции оплачены и есть что оплачивать.
+      function rowState(row) {
+        var total = 0, due = 0;
+        cellsOf(row).forEach(function (cell) {
+          var input = q("input.num", cell);
+          var v = input ? amount(input.value) : 0;
+          total += v;
+          if (!cell.classList.contains("is-paid")) due += v;
+        });
+        return { total: round2(total), due: round2(due), paid: total > 0 && due === 0 };
+      }
+
+      function paintRow(row) {
+        var st = rowState(row);
+        var btn = q(".total-toggle", row);
+        if (!btn) return st;
+        btn.classList.toggle("is-paid", st.paid);
+        btn.setAttribute("aria-pressed", st.paid ? "true" : "false");
+        btn.setAttribute("title", st.paid ? "Оплачено — снять отметку" : "Отметить оплату");
+        var sum = q("[data-total]", btn);
+        if (sum) sum.textContent = dash(st.total);
+        var due = q("[data-due]", btn);
+        if (st.due > 0) {
+          if (!due) {
+            due = document.createElement("span");
+            due.className = "total-due";
+            due.setAttribute("data-due", "");
+            btn.appendChild(due);
+          }
+          due.textContent = "к оплате " + money(st.due);
+        } else if (due) {
+          due.remove();
+        }
+        return st;
+      }
+
       function recalc() {
         var paid = 0, due = 0;
-        qa(".money-card", grid).forEach(function (card) {
-          var sum = 0;
-          qa(".money-cell", card).forEach(function (cell) {
-            var input = q("input.num", cell);
-            var v = input ? amount(input.value) : 0;
-            sum += v;
-            if (q(".paycheck.is-paid", cell)) { paid += v; } else { due += v; }
-          });
-          var out = q("[data-card-total]", card);
-          if (out) out.textContent = dash(sum);
+        rows().forEach(function (row) {
+          var st = paintRow(row);
+          paid += st.total - st.due;
+          due += st.due;
         });
         if (paidOut) paidOut.textContent = money(paid);
         if (dueOut) dueOut.textContent = money(due);
       }
 
-      function paint(cell) {
-        var btn = q(".paycheck", cell), input = q("input.num", cell);
-        if (!btn || !input) return;
+      function paintCell(cell) {
+        var input = q("input.num", cell);
+        if (!input) return;
         var v = amount(input.value);
-        var paid = v > 0 && btn.classList.contains("is-paid");
-        var label = paid ? "Оплачен" : (v === 0 ? "Не задан" : "Не оплачен");
-        btn.classList.toggle("is-paid", paid);
-        btn.setAttribute("aria-pressed", paid ? "true" : "false");
-        btn.setAttribute("title", label);
-        var sr = q(".sr-only", btn);
-        if (sr) sr.textContent = label;
-        cell.classList.toggle("is-unpaid", v > 0 && !paid);
+        var paid = v > 0 && cell.classList.contains("is-paid");
         cell.classList.toggle("is-paid", paid);
+        cell.classList.toggle("is-unpaid", v > 0 && !paid);
         input.disabled = paid;
       }
 
@@ -734,7 +761,7 @@
         var body = "account=" + encodeURIComponent(input.getAttribute("data-account")) +
           "&field=" + field + "&value=" + encodeURIComponent(value);
         setStatus("Сохранение…", "saving");
-        track(fetch(url, {
+        return track(fetch(url, {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
@@ -760,24 +787,38 @@
           "|" + el.getAttribute("data-field");
       }
 
-      // Отметка оплаты: клик по галочке.
+      function mark(row, paid) {
+        cellsOf(row).forEach(function (cell) {
+          cell.classList.toggle("is-paid", paid);
+          cell.classList.toggle("is-unpaid", !paid && amount(q("input.num", cell).value) > 0);
+          var input = q("input.num", cell);
+          if (input) input.disabled = paid && amount(input.value) > 0;
+        });
+      }
+
+      // Клик по «Итого»: отметить строку оплаченной или снять отметку.
       grid.addEventListener("click", function (e) {
-        var btn = e.target.closest ? e.target.closest("button.paycheck") : null;
+        var btn = e.target.closest ? e.target.closest(".total-toggle") : null;
         if (!btn || !grid.contains(btn)) return;
-        var cell = btn.closest(".money-cell");
-        var input = q("input.num", cell);
-        if (!input || amount(input.value) === 0) return;
-        btn.classList.toggle("is-paid");
-        paint(cell);
+        var row = btn.closest("tr.money-line-row");
+        if (!row) return;
+        var st = rowState(row);
+        if (st.total === 0) return;
+        var now = !st.paid;
+        mark(row, now);
         recalc();
-        var field = input.getAttribute("data-field") === "advance" ? "advance_paid" : "paid";
-        save(input, field, btn.classList.contains("is-paid") ? "1" : "");
+        cellsOf(row).forEach(function (cell) {
+          var input = q("input.num", cell);
+          if (!input) return;
+          var field = input.getAttribute("data-field") === "advance" ? "advance_paid" : "paid";
+          save(input, field, now ? "1" : "");
+        });
       });
 
       grid.addEventListener("input", function (e) {
         var input = e.target;
         if (!input.classList || !input.classList.contains("num")) return;
-        paint(input.closest(".money-cell"));
+        paintCell(input.closest(".money-cell"));
         recalc();
         var key = keyOf(input);
         clearTimeout(timers[key]);
@@ -793,7 +834,7 @@
         var key = keyOf(input);
         clearTimeout(timers[key]);
         delete timers[key];
-        paint(input.closest(".money-cell"));
+        paintCell(input.closest(".money-cell"));
         recalc();
         save(input, input.getAttribute("data-field"), input.value.trim());
       });

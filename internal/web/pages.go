@@ -786,7 +786,10 @@ type journalPageData struct {
 	HasYear       bool
 	Resources     []model.Resource
 	JournalTable   journalTableData
-	MoneyGrid      moneyGrid
+	MoneyBlocks    []moneyBlockView
+	MoneyPaid      string
+	MoneyDue       string
+	MoneyHref      string
 	MoneyAny       bool
 	MoneyFromLabel string
 	MoneyToLabel   string
@@ -994,12 +997,12 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 	data.MonthsCount = monthsCount
 	data.HasMonths = monthsCount > 0
 
-	// Начисления — таблица по каждому счёту: колонки «Аванс» и «Счёт»
-	// делятся на ХВС, ГВС и электро, если они включены в настройках прибора.
-	// Суммы и отметки оплаты правятся прямо здесь.
-	data.MoneyGrid = s.buildMoneyGrid(obj, from, to, today, scope, true,
-		reportPreviewHref(obj.ID, "charges", scope, to, from, to))
-	data.MoneyAny = data.MoneyGrid.HasAny
+	var paid, due float64
+	data.MoneyBlocks, paid, due = s.buildMoneyBlocks(obj, from, to, today, scope)
+	data.MoneyPaid = model.FormatMoney(paid)
+	data.MoneyDue = model.FormatMoney(due)
+	data.MoneyAny = len(data.MoneyBlocks) > 0
+	data.MoneyHref = reportPreviewHref(obj.ID, "charges", scope, to, from, to)
 	// Ссылки внутри журнала сохраняют объект, диапазон и фильтр.
 	hrefFor := func(f, t model.Period, sc string) string {
 		q := url.Values{}

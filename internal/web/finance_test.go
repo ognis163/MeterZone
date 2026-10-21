@@ -123,29 +123,61 @@ func TestJournalMoneyRespectsScope(t *testing.T) {
 		}
 	}
 
-	// scope → ожидаемый итог карточки месяца и число ячеек счетов в ней.
-	cases := map[string]struct {
-		total string
-		cells int
-	}{
-		"all":    {"4 500 ₽", 6}, // ХВС, ГВС, электро — аванс и счёт
-		"water":  {"1 500 ₽", 4}, // ХВС и ГВС
-		"energy": {"3 000 ₽", 2}, // только электро
+	// scope → блоки и суммы строк за месяц.
+	type want struct {
+		blocks []string
+		totals []string
 	}
-	for scope, want := range cases {
+	cases := map[string]want{
+		"all":    {[]string{"Электроэнергия", "Водоснабжение"}, []string{"3 000 ₽", "1 000 ₽", "500 ₽"}},
+		"water":  {[]string{"Водоснабжение"}, []string{"1 000 ₽", "500 ₽"}},
+		"energy": {[]string{"Электроэнергия"}, []string{"3 000 ₽"}},
+	}
+	for scope, w := range cases {
 		rr := request(t, h, http.MethodGet,
 			"/journal?object=1&from=2026-10&to=2026-10&scope="+scope, nil, "")
 		if rr.Code != http.StatusOK {
 			t.Fatalf("%s: код %d", scope, rr.Code)
 		}
 		body := rr.Body.String()
-		if !strings.Contains(body, `data-card-total>`+want.total) {
-			t.Fatalf("%s: нет итога %q в карточке месяца", scope, want.total)
+		for _, b := range w.blocks {
+			if !strings.Contains(body, ">"+b+"</b>") {
+				t.Fatalf("%s: нет блока %q", scope, b)
+			}
 		}
-		card := body[strings.Index(body, `data-row="2026-10"`):]
-		card = card[:strings.Index(card, "</article>")]
-		if got := strings.Count(card, `class="money-cell`); got != want.cells {
-			t.Fatalf("%s: ячеек счетов %d, ожидалось %d", scope, got, want.cells)
+		for _, sum := range w.totals {
+			if !strings.Contains(body, `data-total>`+sum) {
+				t.Fatalf("%s: нет итога %q", scope, sum)
+			}
 		}
+	}
+}
+
+// TestJournalMoneyHiddenWithoutFinance — блоки начислений не показываются,
+// если ни у одного прибора не включён финансовый учёт.
+func TestJournalMoneyHiddenWithoutFinance(t *testing.T) {
+	_, st, h := newTestServer(t)
+	meters, err := st.Meters(1, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range meters {
+		m := meters[i]
+		m.FinanceEnabled = false
+		m.FinanceMode = model.FinanceNone
+		if err := st.SaveMeter(&m); err != nil {
+			t.Fatal(err)
+		}
+	}
+	rr := request(t, h, http.MethodGet, "/journal?object=1&from=2026-10&to=2026-10", nil, "")
+	if rr.Code != http.StatusOK {
+		t.Fatalf("код %d", rr.Code)
+	}
+	body := rr.Body.String()
+	if strings.Contains(body, ">Электроэнергия</b>") || strings.Contains(body, ">Водоснабжение</b>") {
+		t.Fatal("блоки начислений показаны без финансового учёта")
+	}
+	if !strings.Contains(body, "Финансовый учёт не включён") {
+		t.Fatal("нет подсказки про финансовый учёт")
 	}
 }

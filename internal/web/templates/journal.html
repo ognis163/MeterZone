@@ -86,22 +86,25 @@
 </section>
 {{end}}
 
-{{/* Начисления: колонки «Аванс» и «Счёт» делятся по счетам (ХВС, ГВС,
-     электро). Всё правится прямо здесь — суммы и отметки оплаты. */}}
-<section class="panel money-table-panel" data-pay-panel data-object="{{.Object.ID}}">
+{{/* Начисления: два блока, как плитки показаний на главной — электро и вода.
+     Блоки есть, только если у прибора включён финансовый учёт. */}}
+<section class="panel money-panel" data-pay-panel data-object="{{.Object.ID}}">
   <div class="section-head">
-    <h2>Начисления за {{.MoneyGrid.RangeLabel}}</h2>
+    <h2>Начисления за {{.RangeLabel}}</h2>
     <div class="section-head-side">
       <div class="sum">
-        <span class="p">Оплачено: <b data-pay-paid>{{.MoneyGrid.PaidText}}</b></span>
-        <span class="d">К оплате: <b data-pay-due>{{.MoneyGrid.DueText}}</b></span>
+        <span class="p">Оплачено: <b data-pay-paid>{{.MoneyPaid}}</b></span>
+        <span class="d">К оплате: <b data-pay-due>{{.MoneyDue}}</b></span>
       </div>
-      <a class="btn btn-ghost btn-sm" href="{{.MoneyGrid.StatementHref}}">{{template "icon-print"}} Печать/отправить</a>
+      <a class="btn btn-ghost btn-sm" href="{{.MoneyHref}}">{{template "icon-print"}} Печать/отправить</a>
     </div>
   </div>
-  {{template "moneygrid" .MoneyGrid}}
-  <p class="hint jscroll-hint">На телефоне таблицу можно прокручивать вбок.</p>
-  <p class="hint">Суммы и отметки оплаты сохраняются сами. Оплаченное приглушено, неоплаченное — обычными чернилами, галочка справа включает оплату.</p>
+  {{if .MoneyAny}}
+  {{template "moneygrid" .}}
+  <p class="hint">Суммы сохраняются сами. Нажмите на «Итого», чтобы отметить месяц оплаченным: полностью оплаченное — зелёным, долг — красным.</p>
+  {{else}}
+  <p class="hint">Финансовый учёт не включён ни у одного прибора — включите его в настройках прибора, и здесь появятся блоки «Электроэнергия» и «Водоснабжение».</p>
+  {{end}}
 </section>
 {{end}}
 {{end}}

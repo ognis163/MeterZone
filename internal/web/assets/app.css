@@ -2535,108 +2535,96 @@ html, body { overscroll-behavior-x: none; }
 .jcount { font-weight: 400; }
 /* ==========================================================================
 /* ==========================================================================
-   Начисления в журнале: карточка на каждый месяц.
-   Спокойно и без шума: оплаченное приглушено, неоплаченное — обычными
-   чернилами, галочка справа, у полей нет рамок.
+   Начисления в журнале: два блока — «Электроэнергия» и «Водоснабжение».
+   Месяц, аванс, счёт, итого. Оплачено — итого зелёным, долг — красным.
    ========================================================================== */
 
-.money-cards {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
+.money-blocks { display: grid; gap: 14px; }
 
-.money-card {
+.money-block {
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 10px 12px 8px;
+  border-radius: 14px;
+  padding: 12px 16px 6px;
   background: var(--surface);
   min-width: 0;
 }
-.money-card.is-current { border-color: var(--line-strong); }
 
-.money-card-head {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: 8px; padding-bottom: 6px; margin-bottom: 2px;
+.money-block-head {
+  display: flex; align-items: center; gap: 8px;
+  padding-bottom: 8px; margin-bottom: 2px;
   border-bottom: 1px solid var(--line);
 }
-.money-card-month { font-size: 13px; font-weight: 600; letter-spacing: -.01em; }
-.money-card-total { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.money-block-head .ico { width: 18px; height: 18px; color: var(--accent); flex: none; }
+.money-block-head b { font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
 
-.money-line {
-  display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) minmax(0, 1fr);
-  gap: 6px;
-  align-items: center;
-  padding: 6px 0;
+table.money-simple { border-collapse: collapse; width: 100%; }
+table.money-simple th {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--faint); font-weight: 600;
+  text-align: right; padding: 9px 8px 7px;
 }
-.money-line + .money-line { border-top: 1px solid var(--line); }
+table.money-simple th.m { text-align: left; }
+table.money-simple td { padding: 2px 8px; text-align: right; vertical-align: middle; }
+table.money-simple td.m { text-align: left; }
+table.money-simple tbody tr { border-top: 1px solid var(--line); }
+table.money-simple tbody tr:first-child { border-top: 0; }
 
-.money-line-name {
-  font-size: 10.5px; font-weight: 600; letter-spacing: .03em;
-  color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+table.money-simple td.month {
+  font-size: 13.5px; font-weight: 600; white-space: nowrap;
+  vertical-align: top; padding-top: 7px; width: 100%;
 }
+table.money-simple td.pos, table.money-simple th + th { width: 150px; }
+table.money-simple th:last-child, table.money-simple td.total-cell { width: 150px; }
+table.money-simple td.month-pair { width: 190px; }
+table.money-simple td.line-name { font-size: 12px; color: var(--muted); white-space: nowrap; width: 110px; vertical-align: top; padding-top: 7px; }
 
-.tone-cold { --tone: #6c93a6; }
-.tone-hot { --tone: #a88274; }
-.tone-energy { --tone: #9c8a5c; }
-.money-line-name.tone-cold, .money-line-name.tone-hot, .money-line-name.tone-energy { color: var(--tone); }
-
-.money-line-cell { display: flex; align-items: center; justify-content: flex-end; min-width: 0; }
-.money-card-cols {
-  display: grid;
-  grid-template-columns: 54px minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px;
-  padding: 3px 0 0;
-  font-size: 8.5px; text-transform: uppercase; letter-spacing: .07em;
-  color: var(--faint);
-}
-.money-card-cols span:nth-child(2),
-.money-card-cols span:nth-child(3) { text-align: right; padding-right: 20px; }
-
-/* Ячейка: сумма как текст, галочка справа. */
+/* Позиция: поле с рамкой и галочка оплаты внутри справа. */
 .money-cell {
-  display: flex; align-items: center; justify-content: flex-end;
-  gap: 3px; min-width: 0; border-radius: 6px;
+  display: inline-flex; align-items: center; justify-content: flex-end;
+  gap: 6px; min-width: 0;
 }
-.money-cell.is-off { min-height: 22px; }
 .money-cell .num {
-  width: 100%; min-width: 0; min-height: 0;
-  padding: 2px 3px; font-size: 13.5px; text-align: right;
-  border: 0; border-radius: 6px;
-  background: transparent; color: var(--ink);
+  width: 100px; height: 28px; padding: 0 9px;
+  border: 1px solid var(--line-strong); border-radius: 9px;
+  background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 13.5px; text-align: right;
   font-variant-numeric: tabular-nums;
 }
-.money-cell .num:hover { background: var(--surface-2); }
+.money-cell .num::placeholder { color: var(--faint); }
+.money-cell .num:hover { border-color: var(--line-strong); }
 .money-cell .num:focus {
-  outline: none; background: var(--surface-2);
-  box-shadow: inset 0 -1.5px 0 var(--accent);
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .money-cell .num:disabled {
-  background: transparent; opacity: 1; cursor: default;
+  background: var(--surface-2); border-color: var(--line);
   color: var(--muted); -webkit-text-fill-color: var(--muted);
 }
-.money-cell .num::placeholder { color: var(--faint); }
 
-.money-cell .paycheck {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 15px; height: 15px; padding: 0; flex: none;
-  border: 0; border-radius: 4px; background: none;
-  color: var(--ok); opacity: 0;
-  transition: opacity .12s ease, background .12s ease;
-}
-.money-cell .paycheck svg { width: 10px; height: 10px; }
-.money-cell .paycheck.is-paid { opacity: .5; }
-.money-cell:hover .paycheck,
-.money-cell:focus-within .paycheck { opacity: .9; }
-.money-cell .paycheck:hover { background: var(--surface-2); opacity: 1; }
-.money-cell .paycheck:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; opacity: 1; }
-@media (hover: none) { .money-cell .paycheck { opacity: .45; } }
+/* Галочка: видна у оплаченного, у неоплаченного — по наведению. */
+.money-cell .tick { width: 13px; height: 13px; flex: none; color: var(--ok); opacity: 0; }
+.money-cell.is-paid .tick { opacity: 1; }
+.money-cell:hover .tick { opacity: .45; }
+.money-cell.is-paid:hover .tick { opacity: 1; }
+@media (hover: none) { .money-cell .tick { opacity: .4; } .money-cell.is-paid .tick { opacity: 1; } }
 
-@media (max-width: 1000px) {
-  .money-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* Итог строки — кнопка отметки оплаты. */
+td.total-cell { white-space: nowrap; }
+.total-toggle {
+  display: inline-flex; flex-direction: column; align-items: flex-end; gap: 1px;
+  padding: 4px 8px; margin: -4px -8px;
+  border: 0; border-radius: 8px; background: none;
+  font: inherit; color: inherit; cursor: pointer; text-align: right;
 }
-@media (max-width: 700px) {
-  .money-cards { grid-template-columns: minmax(0, 1fr); }
-  .money-line { grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1fr); }
+.total-toggle:hover { background: var(--surface-2); }
+.total-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.total-sum { font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.total-toggle.is-paid .total-sum { color: var(--ok); }
+.total-due { font-size: 11px; color: #a8392a; font-variant-numeric: tabular-nums; }
+:root[data-theme="dark"] .total-due { color: #ff9a80; }
+
+@media (max-width: 759px) {
+  .money-block { padding: 10px 12px 4px; }
+  .money-cell .num { width: 84px; height: 32px; padding: 0 8px; }
+  table.money-simple th, table.money-simple td { padding-left: 5px; padding-right: 5px; }
 }
