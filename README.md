@@ -121,22 +121,23 @@ curl -fsSL https://github.com/ognis163/MeterZone/releases/latest/download/instal
 
 ## Запуск в Docker (Synology DSM и любой Linux)
 
-В репозитории есть `Dockerfile` и `docker-compose.yml`: образ собирается
-внутри, поэтому подходит и arm64, и x86_64.
+Готовый образ собирается автоматически и раздаётся отдельным репозиторием
+[ognis163/meterzone-dist](https://github.com/ognis163/meterzone-dist) —
+компилировать на NAS ничего не нужно.
 
 ```sh
-docker compose up -d --build
+docker run -d --name meterzone -p 8099:8099 -v "$PWD/data:/data" \
+  ghcr.io/ognis163/meterzone-dist:latest
 ```
 
-Откройте `http://адрес-устройства:8099`. База и копии — в папке `data/`
-рядом с `docker-compose.yml`, она переживает пересборку образа.
+Откройте `http://адрес-устройства:8099`. База и копии — в папке `data/`,
+она переживает обновление образа. Для Synology удобнее
+`docker-compose.yml` из того же репозитория.
 
 Все параметры задаются переменными: `PORT`, `HOST`, `APP_DB`,
-`APP_BACKUP_DIR`, `APP_TZ`. В контейнере порт меняется только в
-`docker-compose.yml` (переменная `PORT_FIXED=1` отключает смену
-порта из интерфейса, иначе приложение уедет на непроброшенный порт).
-
-Пошагово для Synology — в [deploy/INSTALL_Docker_DSM.md](deploy/INSTALL_Docker_DSM.md).
+`APP_BACKUP_DIR`, `APP_TZ`. В контейнере порт меняется только снаружи
+(`PORT_FIXED=1` отключает смену порта из интерфейса, иначе приложение
+уедет на непроброшенный порт).
 
 ## Структура репозитория
 
@@ -149,9 +150,7 @@ internal/docgen          документы: общая модель, PDF чер
 internal/third_party     форк раскладки и отрисовки gpdf с исправлением позиций
 internal/web             HTTP, шаблоны, стили, скрипты
 internal/mail            отправка писем по SMTP
-deploy                   автозапуск и инструкции для Keenetic и Synology DSM
-Dockerfile               сборка образа (multi-stage, arm64 и x86_64)
-docker-compose.yml       запуск в Container Manager / docker compose
+deploy                   автозапуск и инструкция для Keenetic
 ```
 
 ## Документы
