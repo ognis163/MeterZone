@@ -1,0 +1,19 @@
+# Всё, что не нужно внутри образа.
+.git
+.gitignore
+data
+deploy/dist
+.tmp
+
+# Собранные файлы и базы
+*.exe
+meterzone
+meterzone-*
+*.db
+*.db-wal
+*.db-shm
+
+# Документация и скриншоты не влияют на сборку
+docs
+README.md
+LICENSE

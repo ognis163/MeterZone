@@ -119,6 +119,25 @@ curl -fsSL https://github.com/ognis163/MeterZone/releases/latest/download/instal
 
 Пошагово, вручную — в [deploy/INSTALL_Keenetic.md](deploy/INSTALL_Keenetic.md).
 
+## Запуск в Docker (Synology DSM и любой Linux)
+
+В репозитории есть `Dockerfile` и `docker-compose.yml`: образ собирается
+внутри, поэтому подходит и arm64, и x86_64.
+
+```sh
+docker compose up -d --build
+```
+
+Откройте `http://адрес-устройства:8099`. База и копии — в папке `data/`
+рядом с `docker-compose.yml`, она переживает пересборку образа.
+
+Все параметры задаются переменными: `PORT`, `HOST`, `APP_DB`,
+`APP_BACKUP_DIR`, `APP_TZ`. В контейнере порт меняется только в
+`docker-compose.yml` (переменная `PORT_FIXED=1` отключает смену
+порта из интерфейса, иначе приложение уедет на непроброшенный порт).
+
+Пошагово для Synology — в [deploy/INSTALL_Docker_DSM.md](deploy/INSTALL_Docker_DSM.md).
+
 ## Структура репозитория
 
 ```
@@ -130,7 +149,9 @@ internal/docgen          документы: общая модель, PDF чер
 internal/third_party     форк раскладки и отрисовки gpdf с исправлением позиций
 internal/web             HTTP, шаблоны, стили, скрипты
 internal/mail            отправка писем по SMTP
-deploy                   скрипт автозапуска и инструкция для Keenetic
+deploy                   автозапуск и инструкции для Keenetic и Synology DSM
+Dockerfile               сборка образа (multi-stage, arm64 и x86_64)
+docker-compose.yml       запуск в Container Manager / docker compose
 ```
 
 ## Документы

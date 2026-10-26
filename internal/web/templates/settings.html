@@ -55,10 +55,14 @@
         <span class="pill">{{.Port}}</span>
       </div>
       <p class="hint">Порт веб-интерфейса. После смены откроется новый адрес — обновите закладку.</p>
+      {{if .PortLocked}}
+      <p class="hint">Приложение запущено в контейнере: порт задаётся в <span class="mono">docker-compose.yml</span> вместе с пробросом портов.</p>
+      {{else}}
       <form method="post" action="/settings/port" class="port-form">
         <input type="text" name="port" value="{{.Port}}" inputmode="numeric" autocomplete="off" aria-label="Порт">
         <button class="btn" type="submit">Сменить порт</button>
       </form>
+      {{end}}
     </section>
 
     <section class="panel" id="backup">

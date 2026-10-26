@@ -26,6 +26,7 @@ type settingsPageData struct {
 	BackupDir          string
 	DBPath             string
 	Port               int
+	PortLocked         bool
 	Uptime             string
 	Imported           *store.ImportStats
 	Timezone           string
@@ -52,6 +53,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		BackupDir:          s.BackupDir,
 		DBPath:             s.Store.Path(),
 		Port:               s.Port,
+		PortLocked:         portLocked(),
 		Uptime:             humanUptime(time.Since(s.Started)),
 		Timezone:           timezoneLabel(s.Loc),
 		SMTP:               smtpToView(s.loadSMTP()),
@@ -99,6 +101,10 @@ func (s *Server) handleBackupNow(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePortSave(w http.ResponseWriter, r *http.Request) {
+	if portLocked() {
+		s.settingsError(w, r, "Порт задаётся при запуске контейнера. Измените его в docker-compose.yml и перезапустите.")
+		return
+	}
 	if err := r.ParseForm(); err != nil {
 		s.settingsError(w, r, "Не удалось прочитать форму.")
 		return
@@ -241,6 +247,7 @@ func (s *Server) settingsError(w http.ResponseWriter, r *http.Request, msg strin
 		BackupDir:          s.BackupDir,
 		DBPath:             s.Store.Path(),
 		Port:               s.Port,
+		PortLocked:         portLocked(),
 		Uptime:             humanUptime(time.Since(s.Started)),
 		Timezone:           timezoneLabel(s.Loc),
 		SMTP:               smtpToView(s.loadSMTP()),
@@ -248,6 +255,11 @@ func (s *Server) settingsError(w http.ResponseWriter, r *http.Request, msg strin
 		BackupEmail:        s.Store.Setting("backup_email", ""),
 	})
 }
+
+// portLocked сообщает, что порт задан снаружи (Docker): менять его
+// из интерфейса нельзя, иначе приложение переедет на порт, который
+// наружу не проброшен, и станет недоступным.
+func portLocked() bool { return os.Getenv("PORT_FIXED") == "1" }
 
 func (s *Server) handleSMTPSave(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
