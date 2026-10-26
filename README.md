@@ -31,6 +31,19 @@ MeterZone by OGNIS.
   <img src="docs/screens/journal-mobile.png" width="300" alt="Журнал на телефоне">
 </p>
 
+## Установка
+
+Готовые сборки и пошаговые инструкции — в отдельном репозитории
+**[ognis163/meterzone-dist](https://github.com/ognis163/meterzone-dist)**:
+
+| Куда | Инструкция |
+|---|---|
+| Synology DSM 7 (Docker, Container Manager) | [INSTALL_DSM.md](https://github.com/ognis163/meterzone-dist/blob/main/docs/INSTALL_DSM.md) |
+| Keenetic / Entware (aarch64) | [INSTALL_KEENETIC.md](https://github.com/ognis163/meterzone-dist/blob/main/docs/INSTALL_KEENETIC.md) |
+
+Здесь, в MeterZone, — исходный код. Собирать самому нужно, только если
+вы вносите изменения; см. раздел «Сборка» ниже.
+
 ## Установка как приложение на телефон
 
 На iPhone откройте сайт в Safari, нажмите «Поделиться» → **На экран «Домой»**.
@@ -95,29 +108,25 @@ go build -trimpath -ldflags "-s -w" -o meterzone .
 На Keenetic с Entware, по SSH под root:
 
 ```sh
-curl -fsSL https://github.com/ognis163/MeterZone/releases/latest/download/install.sh | /opt/bin/sh
+curl -fsSL https://github.com/ognis163/meterzone-dist/releases/latest/download/install-keenetic.sh | sh
 ```
 
-Скрипт скачает последний релиз для aarch64, установит его в `/opt/meterzone`,
+Скрипт скачает последний бинарник для aarch64, установит его в `/opt/meterzone`,
 настроит автозапуск `/opt/etc/init.d/S99meterzone`, запустит сервис и покажет адрес.
 Существующая база `data/meterzone.db` не удаляется.
 
-Другой порт:
+Другой порт и часовой пояс:
 
 ```sh
-curl -fsSL https://github.com/ognis163/MeterZone/releases/latest/download/install.sh | PORT=8090 /opt/bin/sh
-```
-
-Если время в приложении отличается от местного, задайте часовой пояс:
-
-```sh
-curl -fsSL https://github.com/ognis163/MeterZone/releases/latest/download/install.sh | APP_TZ=Europe/Moscow /opt/bin/sh
+curl -fsSL https://github.com/ognis163/meterzone-dist/releases/latest/download/install-keenetic.sh \
+  | PORT=8090 APP_TZ=Europe/Moscow sh
 ```
 
 Нужен Keenetic Hopper (aarch64) с Entware и доступом в интернет.
-Если нет `curl`, используйте `wget -qO- <тот же адрес> | /opt/bin/sh`.
+Если нет `curl`, используйте `wget -qO- <тот же адрес> | sh`.
 
-Пошагово, вручную — в [deploy/INSTALL_Keenetic.md](deploy/INSTALL_Keenetic.md).
+Пошагово, вручную — в
+[INSTALL_KEENETIC.md](https://github.com/ognis163/meterzone-dist/blob/main/docs/INSTALL_KEENETIC.md).
 
 ## Запуск в Docker (Synology DSM и любой Linux)
 
