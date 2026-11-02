@@ -2698,7 +2698,7 @@ td.total-cell { white-space: nowrap; }
    ========================================================================== */
 
 @media (min-width: 760px) {
-  body { zoom: 1.2; }
+  body { zoom: 1.1; }
 }
 
 /* ---------- выбор месяца: что показываем на каком экране ---------- */
@@ -2772,7 +2772,16 @@ td.total-cell { white-space: nowrap; }
   text-decoration: none;
 }
 .yw-item:hover { background: var(--surface-2); color: var(--ink); }
-.yw-item.is-current { background: var(--accent); color: var(--on-accent); font-weight: 650; }
+.yw-item.is-current { background: transparent; color: var(--accent); font-weight: 650; }
+
+/* «Окно» выбора: подсвечивает год, стоящий по центру. */
+.year-band {
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  width: 132px; height: 38px; border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  z-index: 41; pointer-events: none;
+}
+.year-band[hidden] { display: none; }
 
 /* ---------- журнал: компактные ряды фильтров на телефоне ---------- */
 
@@ -2819,9 +2828,15 @@ td.total-cell { white-space: nowrap; }
 }
 .btn-duo .bd-part {
   position: relative;
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 42px; border: 0; background: transparent;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 0 14px; border: 0; background: transparent;
   color: var(--ink-2); cursor: pointer;
+  font-family: inherit; font-size: 12px; text-decoration: none;
+}
+.btn-duo .bd-label { white-space: nowrap; }
+@media (max-width: 759px) {
+  .btn-duo .bd-part { padding: 0 10px; }
+  .btn-duo .bd-label { display: none; }
 }
 .btn-duo .bd-part + .bd-part::before {
   content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 1px;
@@ -2829,6 +2844,33 @@ td.total-cell { white-space: nowrap; }
 }
 .btn-duo .bd-part:hover { color: var(--accent); }
 .btn-duo .bd-part .ico { width: 16px; height: 16px; }
+
+/* ---------- отдельная кнопка «Дубль. Счетчик» ---------- */
+
+.dup-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 34px; padding: 0 13px;
+  border-radius: 10px; border: 1px dashed var(--line-strong);
+  background: transparent; color: var(--muted);
+  font-size: 12px; font-weight: 600; text-decoration: none;
+  white-space: nowrap;
+}
+.dup-btn .ico { width: 13px; height: 13px; }
+.dup-btn:hover { color: var(--ink); border-color: var(--ink-2); }
+.dup-btn.is-on {
+  border-style: solid; border-color: transparent;
+  background: var(--accent-soft); color: var(--accent);
+}
+
+/* ---------- телефон: один кегль во всех фильтрах ---------- */
+
+@media (max-width: 759px) {
+  .jrange-cap { font-size: 11px; }
+  .jrange > .jrange-seg .seg-link { font-size: 12px; padding: 8px 4px; }
+  .jrange-custom input[type="month"] { font-size: 12.5px; }
+  .jrange-actions .btn { font-size: 12px; }
+  .dup-btn { min-height: 36px; font-size: 12px; }
+}
 
 /* ---------- таблица «Итоги»: заголовки над числами ---------- */
 
@@ -2866,6 +2908,8 @@ td.total-cell { white-space: nowrap; }
 
 /* Форма прибора: блок показаний дублирующего. */
 .dup-reads[hidden] { display: none; }
+.dup-block[hidden] { display: none; }
+.dup-block .form-divider { margin-top: 0; }
 .dup-delta {
   margin: 2px 0 6px; padding: 9px 12px; border-radius: 10px;
   background: var(--accent-soft); color: var(--accent);

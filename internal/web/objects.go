@@ -74,6 +74,12 @@ type objectFormData struct {
 	Resources     []model.Resource
 	ParentOptions []model.Meter
 	Meter         model.Meter
+
+	// Общие с формой прибора поля разницы дублирующего счётчика.
+	RefReading float64
+	DupReading float64
+	OffsetText string
+	OffsetNote string
 }
 
 func (s *Server) handleObjectNew(w http.ResponseWriter, r *http.Request) {

@@ -35,41 +35,46 @@
     <input type="text" name="installed_on" value="{{.Meter.InstalledOn}}"
            placeholder="ГГГГ-ММ-ДД" inputmode="numeric" autocomplete="off">
   </div>
-  {{if .Meter.Resource.IsEnergy}}
-  <div class="field span-2">
-    <label>Дублирующий счётчик</label>
-    <select name="parent_id" data-dup-select>
-      <option value="0">Нет — самостоятельный прибор</option>
-      {{range .ParentOptions}}
-      <option value="{{.ID}}" {{if eq .ID $.Meter.ParentID}}selected{{end}}>
-        {{.Title}}{{if .Detail}} · {{.Detail}}{{end}} — {{.Resource.Label}}
-      </option>
-      {{end}}
-    </select>
-    <p class="hint">Дублирующий повторяет расчётный со сдвигом. Подключить можно в любой момент.</p>
-  </div>
+  <div class="dup-block span-2" data-dup-block>
+    <div class="form-divider">
+      <h3>Дублирующий счётчик</h3>
+      <span>только для электроэнергии</span>
+    </div>
 
-  <div class="dup-reads span-2" data-dup-reads {{if not .Meter.ParentID}}hidden{{end}}>
     <div class="form-grid">
-      <div class="field">
-        <label>Показания расчётного</label>
-        <input type="text" name="read_ref" value="{{fmtInput .RefReading}}" inputmode="decimal"
-               autocomplete="off" placeholder="например 12 780,0" data-dup-ref>
-      </div>
-      <div class="field">
-        <label>Показания дублирующего</label>
-        <input type="text" name="read_dup" value="{{fmtInput .DupReading}}" inputmode="decimal"
-               autocomplete="off" placeholder="например 12 810,0" data-dup-dup>
+      <div class="field span-2">
+        <label>Расчётный счётчик</label>
+        <select name="parent_id" data-dup-select>
+          <option value="0">Нет — самостоятельный прибор</option>
+          {{range .ParentOptions}}
+          <option value="{{.ID}}" {{if eq .ID $.Meter.ParentID}}selected{{end}}>
+            {{.Title}}{{if .Detail}} · {{.Detail}}{{end}}
+          </option>
+          {{end}}
+        </select>
+        <p class="hint">Подключить можно в любой момент: дублирующий повторяет расчётный со сдвигом.</p>
       </div>
     </div>
-    <p class="dup-delta" data-dup-delta {{if not .Meter.OffsetSet}}hidden{{end}}>
-      Разница <b>{{.OffsetText}}</b> — {{.OffsetNote}}
-    </p>
-    <p class="hint">Спишите оба счётчика: разница посчитается сама. В отчёт энергосбыта уходит только расчётный.</p>
+
+    <div class="dup-reads" data-dup-reads {{if not .Meter.ParentID}}hidden{{end}}>
+      <div class="form-grid">
+        <div class="field">
+          <label>Показания расчётного</label>
+          <input type="text" name="read_ref" value="{{fmtInput .RefReading}}" inputmode="decimal"
+                 autocomplete="off" placeholder="например 12 780,0" data-dup-ref>
+        </div>
+        <div class="field">
+          <label>Показания дублирующего</label>
+          <input type="text" name="read_dup" value="{{fmtInput .DupReading}}" inputmode="decimal"
+                 autocomplete="off" placeholder="например 12 810,0" data-dup-dup>
+        </div>
+      </div>
+      <p class="dup-delta" data-dup-delta {{if not .Meter.OffsetSet}}hidden{{end}}>
+        Разница <b>{{.OffsetText}}</b> — {{.OffsetNote}}
+      </p>
+      <p class="hint">Спишите оба счётчика: разница посчитается сама. В отчёт энергосбыта уходит только расчётный.</p>
+    </div>
   </div>
-  {{else}}
-  <input type="hidden" name="parent_id" value="0">
-  {{end}}
   <div class="field">
     <label>Финансовый учёт</label>
     <select name="finance_mode">

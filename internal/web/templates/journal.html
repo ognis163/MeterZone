@@ -36,8 +36,11 @@
       <a class="seg-link{{if eq .Scope "all"}} is-active{{end}}" href="{{.ScopeAllHref}}"{{if eq .Scope "all"}} aria-current="true"{{end}}>Всё</a>
       <a class="seg-link{{if eq .Scope "water"}} is-active{{end}}" href="{{.ScopeWaterHref}}"{{if eq .Scope "water"}} aria-current="true"{{end}}>Вода</a>
       <a class="seg-link{{if eq .Scope "energy"}} is-active{{end}}" href="{{.ScopeEnergyHref}}"{{if eq .Scope "energy"}} aria-current="true"{{end}}>Электро</a>
-      <a class="seg-link{{if .DupOn}} is-active{{end}}" href="{{.DupHref}}"{{if .DupOn}} aria-current="true"{{end}}><i class="d-long">Дублирующий</i><i class="d-short">Дубль</i></a>
     </div>
+    <a class="dup-btn{{if .DupOn}} is-on{{end}}" href="{{.DupHref}}"{{if .DupOn}} aria-current="true"{{end}}>
+      {{if .DupOn}}{{template "icon-check"}}{{else}}{{template "icon-plus"}}{{end}}
+      Дубль. Счетчик
+    </a>
   </div>
 
   <div class="jrange jrange-export">
@@ -46,8 +49,8 @@
       <a class="btn btn-ghost btn-sm" href="{{.CSVHref}}">{{template "icon-download"}} CSV</a>
       <a class="btn btn-ghost btn-sm" href="{{.DocPDFHref}}">{{template "icon-report"}} PDF</a>
       <div class="btn-duo">
-        <a class="bd-part" href="{{.StatementHref}}" aria-label="Печать" title="Печать">{{template "icon-print"}}</a>
-        <a class="bd-part" href="{{.StatementHref}}#send" aria-label="Отправить на почту" title="Отправить на почту">{{template "icon-mail"}}</a>
+        <a class="bd-part" href="{{.StatementHref}}" title="Печать">{{template "icon-print"}}<span class="bd-label">Печать</span></a>
+        <a class="bd-part" href="{{.StatementHref}}#send" title="Отправить на почту">{{template "icon-mail"}}<span class="bd-label">email</span></a>
       </div>
     </div>
   </div>

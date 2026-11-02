@@ -928,8 +928,10 @@
       wheel.scrollTop = cur.offsetTop - (wheel.clientHeight - cur.offsetHeight) / 2;
       wheel.style.scrollBehavior = "";
     }
+    var band = document.querySelector("[data-year-band]");
     function open(show) {
       wheel.hidden = !show;
+      if (band) band.hidden = !show;
       toggle.setAttribute("aria-expanded", show ? "true" : "false");
       if (show) requestAnimationFrame(centerYear);
     }
@@ -994,4 +996,20 @@
     if (dup) dup.addEventListener("input", updateDelta);
     updateDelta();
   }
+})();
+/* Блок дублирующего счётчика показываем только для электроэнергии. */
+(function () {
+  "use strict";
+  var block = document.querySelector("[data-dup-block]");
+  var resource = document.querySelector('select[name="resource"]');
+  if (!block || !resource) return;
+  var sel = document.querySelector("[data-dup-select]");
+  function refresh() {
+    var isEnergy = resource.value === "energy";
+    block.hidden = !isEnergy;
+    if (!isEnergy && sel) sel.value = "0";
+    if (sel) sel.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  resource.addEventListener("change", refresh);
+  refresh();
 })();
