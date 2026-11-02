@@ -67,6 +67,11 @@ type Meter struct {
 	Archived       bool
 	Sort           int
 
+	// Offset — разница дублирующего от расчётного: дубль = расчётный + Offset.
+	// OffsetSet — разница задана явно, иначе считаем по предыдущим показаниям.
+	Offset    float64
+	OffsetSet bool
+
 	// PreviousSerial — заводской номер, который был до замены счётчика,
 	// ReplacedAt — месяц замены (YYYY-MM), с которого идёт новый отсчёт.
 	PreviousSerial string

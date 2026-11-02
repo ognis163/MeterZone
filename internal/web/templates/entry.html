@@ -37,10 +37,10 @@
           <div class="meter-name">
             <span>
               {{.Meter.Title}}
-              {{if .IsSub}}<span class="badge badge-sub">дубль</span>{{end}}
+              {{if .IsSub}}<span class="badge badge-sub">дублирующий</span>{{end}}
             </span>
             {{if .Meter.Detail}}<small class="meter-id">{{.Meter.Detail}}</small>{{end}}
-            {{if .HasChildren}}<small class="net-note">есть дублирующий счётчик</small>{{end}}
+            {{if .HasChildren}}<small class="net-note">расчётный для этого дубля</small>{{end}}
           </div>
           <div class="meter-prev">
             <span class="lbl">пред.</span>
@@ -58,7 +58,7 @@
             <span class="lbl">расход</span>
             <span class="val" data-diff="{{.Meter.ID}}">{{if .HasDiff}}{{fmtVal .Diff}}{{else}}—{{end}}</span>
           </div>
-          {{if .HasDerived}}<p class="dup-note">Дубль · смещение {{.OffsetText}} · к отправке {{.DerivedText}} {{$unit}}</p>{{end}}
+          {{if .HasDerived}}<p class="dup-note">Дублирующий · расчётный {{.DerivedText}} {{$unit}}. В энергосбыт уходит расчётный.</p>{{end}}
           {{if .Invalid}}<p class="meter-error">Меньше предыдущего или отрицательный расход — проверьте число.</p>{{end}}
         </div>
         {{end}}

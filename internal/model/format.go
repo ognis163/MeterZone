@@ -124,3 +124,16 @@ func Consumption(prev, curr float64) (float64, bool) {
 	}
 	return d, true
 }
+
+// FormatSigned форматирует число со знаком: +30, −30, 0.
+func FormatSigned(v float64) string {
+	r := Round3(v)
+	s := FormatValue(math.Abs(r))
+	switch {
+	case r > 0:
+		return "+" + s
+	case r < 0:
+		return "−" + s
+	}
+	return s
+}

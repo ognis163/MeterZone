@@ -21,6 +21,7 @@ type monthStripView struct {
 	PrevHref  string
 	NextHref  string
 	IsCurrent bool
+	Years     []monthYearItem
 }
 
 // monthNavView — общий блок выбора месяца: полоса на ПК, стрелки на телефоне.
@@ -45,6 +46,18 @@ func buildMonthStrip(p model.Period, hasData map[string]bool, href func(model.Pe
 		PrevHref:  href(p.Add(-12)),
 		NextHref:  href(p.Add(12)),
 		IsCurrent: p == today,
+	}
+	// Годы для колеса на телефоне: пять назад и пять вперёд.
+	for y := p.Year - 5; y <= p.Year+5; y++ {
+		cell, err := model.NewPeriod(y, p.Month)
+		if err != nil {
+			continue
+		}
+		view.Years = append(view.Years, monthYearItem{
+			Year:    y,
+			Href:    href(cell),
+			Current: y == p.Year,
+		})
 	}
 	for m := 1; m <= 12; m++ {
 		cell, err := model.NewPeriod(p.Year, m)
@@ -87,4 +100,11 @@ func monthsMap(list []model.Period) map[string]bool {
 		out[p.String()] = true
 	}
 	return out
+}
+
+// monthYearItem — год в списке выбора года на телефоне.
+type monthYearItem struct {
+	Year    int
+	Href    string
+	Current bool
 }

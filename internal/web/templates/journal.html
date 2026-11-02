@@ -6,7 +6,7 @@
   <a class="btn btn-primary" href="/objects/new">Добавить объект</a>
 </section>
 {{else}}
-<section class="top-panel journal-top">
+<section class="top-panel journal-top{{if .RangeOpen}} range-open{{end}}">
   {{template "objectseg" .}}
 
   <div class="jrange">
@@ -15,10 +15,12 @@
       {{range .Ranges}}
       <a class="seg-link{{if .Active}} is-active{{end}}{{if .Wide}} hide-sm{{end}}" href="{{.Href}}"{{if .Active}} aria-current="true"{{end}}>{{.Label}}</a>
       {{end}}
+      <a class="seg-link seg-custom{{if .RangeOpen}} is-active{{end}}" href="{{.RangeHref}}">Свой</a>
     </div>
     <form method="get" action="/journal" class="jrange-custom">
       <input type="hidden" name="object" value="{{.Object.ID}}">
       {{if ne .Scope "all"}}<input type="hidden" name="scope" value="{{.Scope}}">{{end}}
+      {{if .DupOn}}<input type="hidden" name="dup" value="1">{{end}}
       <span class="jrange-range">
         <input type="month" name="from" value="{{.FromValue}}" min="2000-01" max="2100-12" aria-label="С месяца">
         <span class="jrange-dash">—</span>
@@ -34,6 +36,7 @@
       <a class="seg-link{{if eq .Scope "all"}} is-active{{end}}" href="{{.ScopeAllHref}}"{{if eq .Scope "all"}} aria-current="true"{{end}}>Всё</a>
       <a class="seg-link{{if eq .Scope "water"}} is-active{{end}}" href="{{.ScopeWaterHref}}"{{if eq .Scope "water"}} aria-current="true"{{end}}>Вода</a>
       <a class="seg-link{{if eq .Scope "energy"}} is-active{{end}}" href="{{.ScopeEnergyHref}}"{{if eq .Scope "energy"}} aria-current="true"{{end}}>Электро</a>
+      <a class="seg-link{{if .DupOn}} is-active{{end}}" href="{{.DupHref}}"{{if .DupOn}} aria-current="true"{{end}}><i class="d-long">Дублирующий</i><i class="d-short">Дубль</i></a>
     </div>
   </div>
 
@@ -42,10 +45,14 @@
     <div class="jrange-actions">
       <a class="btn btn-ghost btn-sm" href="{{.CSVHref}}">{{template "icon-download"}} CSV</a>
       <a class="btn btn-ghost btn-sm" href="{{.DocPDFHref}}">{{template "icon-report"}} PDF</a>
-      <button class="btn btn-ghost btn-sm" type="button" data-print>{{template "icon-print"}} Печать</button>
+      <div class="btn-duo">
+        <a class="bd-part" href="{{.StatementHref}}" aria-label="Печать" title="Печать">{{template "icon-print"}}</a>
+        <a class="bd-part" href="{{.StatementHref}}#send" aria-label="Отправить на почту" title="Отправить на почту">{{template "icon-mail"}}</a>
+      </div>
     </div>
   </div>
 </section>
+
 
 {{if not .HasData}}
 <section class="empty-card">

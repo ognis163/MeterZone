@@ -176,48 +176,70 @@ type journalTableData struct {
 
 // journalCol — колонка «Итогов»: ресурс и что в ней — показание или расход.
 type journalCol struct {
-	Title   string
-	IsLast  bool // последняя колонка ресурса: после неё разделитель
+	Title  string
+	IsLast bool // последняя колонка ресурса: после неё разделитель
 }
 
 // journalTableRow — строка «Итогов»: подпись и значения по колонкам.
 type journalTableRow struct {
-	Label string
-	Href  string
+	Label   string
+	Href    string
 	Current bool
-	Empty bool
-	Cells []string
+	Empty   bool
+	Cells   []string
 }
 
 // buildJournalTable раскладывает журнал показаний по той же сетке, что
 // таблица начислений: месяц, по ресурсу «показание» и «расход», итог.
 func buildJournalTable(rows []journalRowView, resources []model.Resource,
-	totals []journalCellView, monthsCount int, rangeLabel, statementHref string) journalTableData {
+	totals []journalCellView, monthsCount int, rangeLabel, statementHref string, dupOn bool) journalTableData {
 
 	td := journalTableData{
 		Months:        monthsCount,
 		MonthsText:    model.PluralRu(monthsCount, "месяц", "месяца", "месяцев"),
 		StatementHref: statementHref,
 	}
-	for _, r := range resources {
+	// Дубли показываем отдельной колонкой только там, где они есть.
+	dupCol := make([]bool, len(resources))
+	if dupOn {
+		for i := range resources {
+			for _, row := range rows {
+				if i < len(row.Cells) && row.Cells[i].HasDup {
+					dupCol[i] = true
+					break
+				}
+			}
+		}
+	}
+	for i, r := range resources {
 		td.Cols = append(td.Cols, journalCol{Title: r.Short() + " · показание"})
-		td.Cols = append(td.Cols, journalCol{Title: r.Short() + " · расход", IsLast: true})
+		td.Cols = append(td.Cols, journalCol{Title: r.Short() + " · расход"})
+		if dupCol[i] {
+			td.Cols = append(td.Cols, journalCol{Title: r.Short() + " · дубль"})
+		}
+		td.Cols[len(td.Cols)-1].IsLast = true
 	}
 	for _, row := range rows {
 		jt := journalTableRow{Label: row.Label, Href: row.Href, Current: row.IsCurrent, Empty: !row.HasAny}
-		for _, c := range row.Cells {
+		for i, c := range row.Cells {
 			jt.Cells = append(jt.Cells, pickValue(c.Reading), pickValue(c.Consumption))
+			if i < len(dupCol) && dupCol[i] {
+				jt.Cells = append(jt.Cells, pickValue(c.DupReading))
+			}
 		}
 		td.Rows = append(td.Rows, jt)
 	}
 	if len(totals) > 0 {
 		td.ShowFoot = true
 		td.Foot = append(td.Foot, "Итого")
-		for _, c := range totals {
+		for i, c := range totals {
 			td.Foot = append(td.Foot, "—")
 			if c.Consumption != "" {
 				td.Foot = append(td.Foot, c.Consumption+" "+c.Unit)
 			} else {
+				td.Foot = append(td.Foot, "—")
+			}
+			if i < len(dupCol) && dupCol[i] {
 				td.Foot = append(td.Foot, "—")
 			}
 		}

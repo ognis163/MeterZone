@@ -743,6 +743,8 @@ type journalCellView struct {
 	Unit        string
 	Reading     string
 	Consumption string
+	DupReading  string
+	HasDup      bool
 	Has         bool
 }
 
@@ -772,19 +774,18 @@ type journalRowView struct {
 	IsCurrent bool
 }
 
-
 type journalPageData struct {
 	Base
-	Object        model.Object
-	Objects       []model.Object
-	Year          int
-	PrevYear      int
-	NextYear      int
-	Rows          []journalRowView
-	Totals        []journalCellView
-	HasData       bool
-	HasYear       bool
-	Resources     []model.Resource
+	Object         model.Object
+	Objects        []model.Object
+	Year           int
+	PrevYear       int
+	NextYear       int
+	Rows           []journalRowView
+	Totals         []journalCellView
+	HasData        bool
+	HasYear        bool
+	Resources      []model.Resource
 	JournalTable   journalTableData
 	MoneyTable     moneyTableView
 	MoneyPaid      string
@@ -794,24 +795,32 @@ type journalPageData struct {
 	MoneyEnabled   bool
 	MoneyFromLabel string
 	MoneyToLabel   string
-	MonthNav      monthNavView
-	SelectedMonth string
-	From          model.Period
-	To            model.Period
-	FromValue     string
-	ToValue       string
-	FromLabel     string
-	ToLabel       string
-	RangeLabel    string
-	Ranges        []journalRangeView
-	BookTotals    []journalTotalView
-	HasMonths     bool
-	MonthsCount   int
+	MonthNav       monthNavView
+	SelectedMonth  string
+	From           model.Period
+	To             model.Period
+	FromValue      string
+	ToValue        string
+	FromLabel      string
+	ToLabel        string
+	RangeLabel     string
+	Ranges         []journalRangeView
+	BookTotals     []journalTotalView
+	HasMonths      bool
+	MonthsCount    int
 
 	Scope           string
 	ScopeAllHref    string
 	ScopeWaterHref  string
 	ScopeEnergyHref string
+
+	// Дублирующие счётчики: отдельная колонка в таблице.
+	DupOn   bool
+	DupHref string
+
+	// RangeOpen — открыты поля произвольного периода ("Свой").
+	RangeOpen bool
+	RangeHref string
 
 	StatementHref string
 
@@ -882,6 +891,7 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 	}
 	year := to.Year
 	scope := scopeParam(r)
+	dupOn := r.URL.Query().Get("dup") == "1"
 
 	od, err := s.loadObjectData(obj.ID)
 	if err != nil {
@@ -1054,6 +1064,32 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 	data.ScopeAllHref = hrefFor(from, to, "all")
 	data.ScopeWaterHref = hrefFor(from, to, "water")
 	data.ScopeEnergyHref = hrefFor(from, to, "energy")
+	data.DupOn = dupOn
+	dupQ := url.Values{}
+	dupQ.Set("object", strconv.FormatInt(obj.ID, 10))
+	dupQ.Set("from", from.String())
+	dupQ.Set("to", to.String())
+	if scope != "all" {
+		dupQ.Set("scope", scope)
+	}
+	if !dupOn {
+		dupQ.Set("dup", "1")
+	}
+	data.DupHref = "/journal?" + dupQ.Encode()
+
+	data.RangeOpen = r.URL.Query().Get("range") == "1"
+	rangeQ := url.Values{}
+	rangeQ.Set("object", strconv.FormatInt(obj.ID, 10))
+	rangeQ.Set("from", from.String())
+	rangeQ.Set("to", to.String())
+	if scope != "all" {
+		rangeQ.Set("scope", scope)
+	}
+	if dupOn {
+		rangeQ.Set("dup", "1")
+	}
+	rangeQ.Set("range", "1")
+	data.RangeHref = "/journal?" + rangeQ.Encode()
 
 	// За один месяц печатаем «Сведения о показаниях», за период — ведомость.
 	statementKind := "range"
@@ -1081,7 +1117,7 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 
 	// Таблица «Итоги» ссылается на лист показаний: собираем её после ссылки.
 	data.JournalTable = buildJournalTable(rows, resources, data.Totals,
-		monthsCount, data.RangeLabel, data.StatementHref)
+		monthsCount, data.RangeLabel, data.StatementHref, dupOn)
 	selected := today
 	if shared.Year == year {
 		selected = shared

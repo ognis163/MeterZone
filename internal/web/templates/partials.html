@@ -82,18 +82,34 @@
 {{end}}
 
 {{define "monthnav"}}
-<div class="monthbar monthbar-mobile" role="group" aria-label="Месяц">
-  <a class="iconbtn" href="{{.PrevHref}}" aria-label="Предыдущий месяц">{{template "icon-left"}}</a>
-  <div class="monthbar-main">
-    <strong>{{.Month.Label}}</strong>
-    {{if .IsCurrent}}<span class="pill">текущий</span>{{end}}
+{{/* ПК: полоса месяцев с годом, как раньше. */}}
+<div class="monthnav-desktop">
+  <div class="month-strip" role="group" aria-label="Выбор месяца">
+    <a class="month-mobile-arrow" href="{{.PrevHref}}" aria-label="Предыдущий месяц">{{template "icon-left"}}</a>
+    <div class="month-strip-months" data-month-strip>
+      {{range .Strip.Cells}}
+        {{if .Disabled}}
+        <span class="month-cell is-disabled" title="За этот месяц нет показаний">{{.Label}}</span>
+        {{else}}
+        <a class="month-cell {{if .Selected}}is-selected{{end}}" href="{{.Href}}"
+           {{if .Selected}}aria-current="date"{{end}}>{{.Label}}{{if .HasData}}<i aria-hidden="true"></i>{{end}}</a>
+        {{end}}
+      {{end}}
+    </div>
+    <div class="month-strip-year">
+      {{with .Strip}}
+      {{if .PrevHref}}<a class="month-year-arrow" href="{{.PrevHref}}" aria-label="Предыдущий год">{{template "icon-left"}}</a>{{else}}<span class="month-year-arrow is-disabled">{{template "icon-left"}}</span>{{end}}
+      <b>{{.Year}}</b>
+      {{if .NextHref}}<a class="month-year-arrow" href="{{.NextHref}}" aria-label="Следующий год">{{template "icon-right"}}</a>{{else}}<span class="month-year-arrow is-disabled">{{template "icon-right"}}</span>{{end}}
+      {{end}}
+    </div>
+    <a class="month-mobile-arrow" href="{{.NextHref}}" aria-label="Следующий месяц">{{template "icon-right"}}</a>
   </div>
-  <a class="iconbtn" href="{{.NextHref}}" aria-label="Следующий месяц">{{template "icon-right"}}</a>
 </div>
 
-<div class="month-strip" role="group" aria-label="Выбор месяца">
-  <a class="month-mobile-arrow" href="{{.PrevHref}}" aria-label="Предыдущий месяц">{{template "icon-left"}}</a>
-  <div class="month-strip-months" data-month-strip>
+{{/* Телефон: лента месяцев свайпом и колесо года из кнопки. */}}
+<div class="mnav-mobile">
+  <div class="month-ribbon" role="group" aria-label="Выбор месяца" data-month-strip>
     {{range .Strip.Cells}}
       {{if .Disabled}}
       <span class="month-cell is-disabled" title="За этот месяц нет показаний">{{.Label}}</span>
@@ -103,14 +119,19 @@
       {{end}}
     {{end}}
   </div>
-  <div class="month-strip-year">
-    {{with .Strip}}
-    {{if .PrevHref}}<a class="month-year-arrow" href="{{.PrevHref}}" aria-label="Предыдущий год">{{template "icon-left"}}</a>{{else}}<span class="month-year-arrow is-disabled">{{template "icon-left"}}</span>{{end}}
-    <b>{{.Year}}</b>
-    {{if .NextHref}}<a class="month-year-arrow" href="{{.NextHref}}" aria-label="Следующий год">{{template "icon-right"}}</a>{{else}}<span class="month-year-arrow is-disabled">{{template "icon-right"}}</span>{{end}}
-    {{end}}
+
+  <div class="year-wrap">
+    <button class="year-chip" type="button" data-year-toggle aria-haspopup="listbox" aria-expanded="false">
+      <span data-year-label>{{.Strip.Year}}</span>
+      {{template "icon-chevron"}}
+    </button>
+    <div class="year-wheel" data-year-wheel role="listbox" aria-label="Год" hidden>
+      {{range .Strip.Years}}
+      <a class="yw-item{{if .Current}} is-current{{end}}" href="{{.Href}}" role="option"
+         {{if .Current}}aria-selected="true"{{end}}>{{.Year}}</a>
+      {{end}}
+    </div>
   </div>
-  <a class="month-mobile-arrow" href="{{.NextHref}}" aria-label="Следующий месяц">{{template "icon-right"}}</a>
 </div>
 {{end}}
 {{define "monthstrip"}}

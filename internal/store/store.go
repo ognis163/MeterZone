@@ -26,7 +26,7 @@ type Store struct {
 // ErrNotFound возвращается, когда запись не найдена.
 var ErrNotFound = errors.New("запись не найдена")
 
-const schemaVersion = 5
+const schemaVersion = 6
 
 // Open открывает базу, применяет схему и проверяет целостность.
 func Open(path string, loc *time.Location) (*Store, error) {
@@ -106,6 +106,8 @@ func (s *Store) migrate() error {
 			start_value REAL NOT NULL DEFAULT 0,
 			installed_on TEXT NOT NULL DEFAULT '',
 			parent_id INTEGER NOT NULL DEFAULT 0,
+			"offset" REAL NOT NULL DEFAULT 0,
+			offset_set INTEGER NOT NULL DEFAULT 0,
 			finance_enabled INTEGER NOT NULL DEFAULT 0,
 			finance_mode TEXT NOT NULL DEFAULT '',
 			archived INTEGER NOT NULL DEFAULT 0,
@@ -159,6 +161,8 @@ func (s *Store) migrate() error {
 		`ALTER TABLE meters ADD COLUMN parent_id INTEGER NOT NULL DEFAULT 0`,
 		`ALTER TABLE meters ADD COLUMN previous_serial TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE meters ADD COLUMN replaced_at TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE meters ADD COLUMN "offset" REAL NOT NULL DEFAULT 0`,
+		`ALTER TABLE meters ADD COLUMN offset_set INTEGER NOT NULL DEFAULT 0`,
 	} {
 		_, _ = tx.Exec(q)
 	}
@@ -341,7 +345,7 @@ func (s *Store) DeleteObject(id int64) error {
 
 // Meters возвращает приборы объекта.
 func (s *Store) Meters(objectID int64, includeArchived bool) ([]model.Meter, error) {
-	q := `SELECT id, object_id, resource, label, brand, serial, start_value, installed_on, parent_id, finance_enabled, finance_mode, archived, sort, previous_serial, replaced_at
+	q := `SELECT id, object_id, resource, label, brand, serial, start_value, installed_on, parent_id, finance_enabled, finance_mode, archived, sort, previous_serial, replaced_at, "offset", offset_set
 		FROM meters WHERE object_id = ?`
 	if !includeArchived {
 		q += ` AND archived = 0`
@@ -387,17 +391,19 @@ func sortMeters(ms []model.Meter) {
 func scanMeter(r rowScanner) (model.Meter, error) {
 	var m model.Meter
 	var archived, finance int
+	var offsetSet int
 	err := r.Scan(&m.ID, &m.ObjectID, &m.Resource, &m.Label, &m.Brand, &m.Serial,
 		&m.StartValue, &m.InstalledOn, &m.ParentID, &finance, &m.FinanceMode, &archived, &m.Sort,
-		&m.PreviousSerial, &m.ReplacedAt)
+		&m.PreviousSerial, &m.ReplacedAt, &m.Offset, &offsetSet)
 	m.Archived = archived != 0
 	m.FinanceEnabled = finance != 0
+	m.OffsetSet = offsetSet != 0
 	return m, err
 }
 
 // Meter возвращает прибор по id.
 func (s *Store) Meter(id int64) (model.Meter, error) {
-	row := s.db.QueryRow(`SELECT id, object_id, resource, label, brand, serial, start_value, installed_on, parent_id, finance_enabled, finance_mode, archived, sort, previous_serial, replaced_at
+	row := s.db.QueryRow(`SELECT id, object_id, resource, label, brand, serial, start_value, installed_on, parent_id, finance_enabled, finance_mode, archived, sort, previous_serial, replaced_at, "offset", offset_set
 		FROM meters WHERE id = ?`, id)
 	m, err := scanMeter(row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -412,10 +418,10 @@ func (s *Store) SaveMeter(m *model.Meter) error {
 		return fmt.Errorf("неизвестный ресурс")
 	}
 	if m.ID == 0 {
-		res, err := s.db.Exec(`INSERT INTO meters (object_id, resource, label, brand, serial, start_value, installed_on, parent_id, finance_enabled, finance_mode, archived, sort, previous_serial, replaced_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		res, err := s.db.Exec(`INSERT INTO meters (object_id, resource, label, brand, serial, start_value, installed_on, parent_id, finance_enabled, finance_mode, archived, sort, previous_serial, replaced_at, "offset", offset_set)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			m.ObjectID, m.Resource, m.Label, m.Brand, m.Serial, m.StartValue, m.InstalledOn,
-			m.ParentID, boolInt(m.FinanceEnabled), m.FinanceModeValue(), boolInt(m.Archived), m.Sort, m.PreviousSerial, m.ReplacedAt)
+			m.ParentID, boolInt(m.FinanceEnabled), m.FinanceModeValue(), boolInt(m.Archived), m.Sort, m.PreviousSerial, m.ReplacedAt, m.Offset, boolInt(m.OffsetSet))
 		if err != nil {
 			return err
 		}
@@ -423,9 +429,9 @@ func (s *Store) SaveMeter(m *model.Meter) error {
 		return err
 	}
 	_, err := s.db.Exec(`UPDATE meters SET resource=?, label=?, brand=?, serial=?, start_value=?,
-		installed_on=?, parent_id=?, finance_enabled=?, finance_mode=?, archived=?, sort=?, previous_serial=?, replaced_at=? WHERE id=?`,
+		installed_on=?, parent_id=?, finance_enabled=?, finance_mode=?, archived=?, sort=?, previous_serial=?, replaced_at=?, "offset"=?, offset_set=? WHERE id=?`,
 		m.Resource, m.Label, m.Brand, m.Serial, m.StartValue, m.InstalledOn,
-		m.ParentID, boolInt(m.FinanceEnabled), m.FinanceModeValue(), boolInt(m.Archived), m.Sort, m.PreviousSerial, m.ReplacedAt, m.ID)
+		m.ParentID, boolInt(m.FinanceEnabled), m.FinanceModeValue(), boolInt(m.Archived), m.Sort, m.PreviousSerial, m.ReplacedAt, m.Offset, boolInt(m.OffsetSet), m.ID)
 	return err
 }
 

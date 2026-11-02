@@ -109,7 +109,7 @@ func TestSubMeterBadge(t *testing.T) {
 		t.Fatalf("код %d", rr.Code)
 	}
 	body := rr.Body.String()
-	if !strings.Contains(body, "дубль") {
+	if !strings.Contains(body, "дублирующий") {
 		t.Fatal("нет отметки дублирующего счётчика")
 	}
 	if !strings.Contains(body, "finance-panel") {

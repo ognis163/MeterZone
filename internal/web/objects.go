@@ -304,6 +304,32 @@ type meterFormData struct {
 	Resources     []model.Resource
 	ParentOptions []model.Meter
 	NextSort      int
+	// Показания расчётного и дублирующего, из которых считается разница.
+	RefReading float64
+	DupReading float64
+	OffsetText string
+	OffsetNote string
+}
+
+// withOffsetReadings заполняет подписи разницы для формы прибора.
+func (d *meterFormData) withOffsetReadings() {
+	d.OffsetText = model.FormatSigned(d.Meter.Offset)
+	switch {
+	case !d.Meter.OffsetSet:
+		d.OffsetNote = "показания ещё не заданы"
+	case d.Meter.Offset > 0:
+		d.OffsetNote = "дублирующий больше расчётного"
+	case d.Meter.Offset < 0:
+		d.OffsetNote = "дублирующий меньше расчётного"
+	default:
+		d.OffsetNote = "показания совпадают"
+	}
+}
+
+// renderMeterForm показывает форму прибора, посчитав разницу дублирующего.
+func (s *Server) renderMeterForm(w http.ResponseWriter, status int, d meterFormData) {
+	d.withOffsetReadings()
+	s.render(w, status, "meter_form", d)
 }
 
 func (s *Server) handleMeterNew(w http.ResponseWriter, r *http.Request) {
@@ -356,7 +382,7 @@ func (s *Server) handleMeterEdit(w http.ResponseWriter, r *http.Request) {
 	s.withObjectContext(w, r, &base, obj.ID, "/")
 	meters, _ := s.Store.Meters(m.ObjectID, true)
 	s.render(w, http.StatusOK, "meter_form", meterFormData{
-		Base: base,
+		Base:          base,
 		Meter:         m,
 		Object:        obj,
 		Resources:     model.ResourceOrder,
@@ -504,7 +530,7 @@ func (s *Server) meterError(w http.ResponseWriter, r *http.Request, m model.Mete
 	base.Error = msg
 	s.withObjectContext(w, r, &base, obj.ID, "/")
 	meters, _ := s.Store.Meters(m.ObjectID, true)
-	s.render(w, http.StatusBadRequest, "meter_form", meterFormData{
+	s.renderMeterForm(w, http.StatusBadRequest, meterFormData{
 		Base:          base,
 		Meter:         m,
 		Object:        obj,

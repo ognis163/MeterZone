@@ -895,3 +895,103 @@
     }, 4200);
   });
 })();
+
+/* 1.5.1: колесо года, автоподстановка расчётного, блок дублирующего в форме. */
+(function () {
+  "use strict";
+
+  var q = function (sel, root) { return (root || document).querySelector(sel); };
+  var qa = function (sel, root) {
+    return Array.prototype.slice.call((root || document).querySelectorAll(sel));
+  };
+
+  function parseNum(raw) {
+    if (raw == null) return null;
+    var s = String(raw).replace(/\u00a0/g, "").replace(/\s/g, "").replace(",", ".");
+    if (!s) return null;
+    var n = Number(s);
+    return isFinite(n) ? n : null;
+  }
+  function fmt(v) {
+    var s = (Math.round(v * 1000) / 1000).toFixed(3).replace(/\.?0+$/, "");
+    return s.replace(".", ",");
+  }
+
+  // --- колесо года -------------------------------------------------------
+  var toggle = q("[data-year-toggle]");
+  var wheel = q("[data-year-wheel]");
+  if (toggle && wheel) {
+    function centerYear() {
+      var cur = q(".yw-item.is-current", wheel);
+      if (!cur) return;
+      wheel.style.scrollBehavior = "auto";
+      wheel.scrollTop = cur.offsetTop - (wheel.clientHeight - cur.offsetHeight) / 2;
+      wheel.style.scrollBehavior = "";
+    }
+    function open(show) {
+      wheel.hidden = !show;
+      toggle.setAttribute("aria-expanded", show ? "true" : "false");
+      if (show) requestAnimationFrame(centerYear);
+    }
+    toggle.addEventListener("click", function (e) {
+      e.stopPropagation();
+      open(wheel.hidden);
+    });
+    document.addEventListener("click", function (e) {
+      if (!wheel.hidden && !wheel.contains(e.target) && e.target !== toggle) open(false);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") open(false);
+    });
+  }
+
+  // --- автоподстановка расчётного из дублирующего ------------------------
+  var subs = qa(".meter-input input[data-parent-meter]");
+  if (subs.length) {
+    subs.forEach(function (child) {
+      var parentId = child.getAttribute("data-parent-meter");
+      var offset = parseNum(child.getAttribute("data-offset"));
+      var parent = q('.meter-input input[data-meter="' + parentId + '"]');
+      if (!parent || offset == null) return;
+      function sync() {
+        var v = parseNum(child.value);
+        if (v == null) return;
+        var target = parent.getAttribute("data-auto") === "1" ? parent : null;
+        if (!target) return;
+        parent.value = fmt(v + offset);
+        parent.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      child.addEventListener("input", sync);
+    });
+  }
+
+  // --- форма прибора: показания дублирующего -----------------------------
+  var sel = q("[data-dup-select]");
+  var box = q("[data-dup-reads]");
+  if (sel && box) {
+    function refresh() {
+      box.hidden = sel.value === "0" || sel.value === "";
+    }
+    sel.addEventListener("change", refresh);
+    refresh();
+
+    var ref = q("[data-dup-ref]");
+    var dup = q("[data-dup-dup]");
+    var delta = q("[data-dup-delta]");
+    function updateDelta() {
+      if (!delta) return;
+      var a = parseNum(ref && ref.value);
+      var b = parseNum(dup && dup.value);
+      if (a == null || b == null) { delta.hidden = true; return; }
+      var d = Math.round((b - a) * 1000) / 1000;
+      var sign = d > 0 ? "+" : (d < 0 ? "−" : "");
+      var note = d > 0 ? "дублирующий больше расчётного"
+        : (d < 0 ? "дублирующий меньше расчётного" : "показания совпадают");
+      delta.hidden = false;
+      delta.innerHTML = "Разница <b>" + sign + fmt(Math.abs(d)) + "</b> — " + note;
+    }
+    if (ref) ref.addEventListener("input", updateDelta);
+    if (dup) dup.addEventListener("input", updateDelta);
+    updateDelta();
+  }
+})();

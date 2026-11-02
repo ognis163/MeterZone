@@ -2687,3 +2687,188 @@ td.total-cell { white-space: nowrap; }
   .money-panel .section-head-side { width: 100%; justify-content: space-between; }
   .money-panel .section-head-side .sum { flex-wrap: wrap; }
 }
+
+/* ==========================================================================
+   1.5.1
+
+   — ПК: всё крупнее на 20 %;
+   — телефон: лента месяцев свайпом и колесо года из кнопки;
+   — журнал: компактные ряды фильтров, одна кнопка «печать + почта»;
+   — таблица «Итоги»: заголовки над числами, колонки воды рядом.
+   ========================================================================== */
+
+@media (min-width: 760px) {
+  body { zoom: 1.2; }
+}
+
+/* ---------- выбор месяца: что показываем на каком экране ---------- */
+
+.mnav-mobile { display: none; }
+
+@media (max-width: 759px) {
+  .monthnav-desktop { display: none; }
+  .mnav-mobile { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; }
+}
+
+/* ---------- телефон: лента месяцев ---------- */
+
+.month-ribbon {
+  position: relative; flex: 1 1 auto; min-width: 0;
+  display: flex; gap: 3px; padding: 0 2px;
+  overflow-x: auto; overflow-y: hidden;
+  scroll-behavior: smooth; scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.month-ribbon::-webkit-scrollbar { display: none; }
+.month-ribbon .month-cell {
+  flex: 0 0 auto; width: 54px; height: 40px;
+  border-radius: 10px; font-size: 12.5px; font-weight: 550;
+  scroll-snap-align: center; padding-bottom: 5px;
+}
+.month-ribbon .month-cell i { bottom: 6px; }
+.month-ribbon::before,
+.month-ribbon::after {
+  content: ""; position: sticky; z-index: 2; flex: 0 0 22px; pointer-events: none;
+}
+.month-ribbon::before { left: 0; margin-right: -22px; background: linear-gradient(90deg, var(--surface), transparent); }
+.month-ribbon::after { right: 0; margin-left: -22px; background: linear-gradient(270deg, var(--surface), transparent); }
+
+/* ---------- телефон: кнопка года и колесо ---------- */
+
+.year-wrap { position: relative; flex: none; }
+
+.year-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  height: 40px; padding: 0 9px 0 11px;
+  border-radius: 10px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink);
+  font-family: inherit; font-size: 13px; font-weight: 650;
+  font-variant-numeric: tabular-nums; letter-spacing: -.01em;
+}
+.year-chip .ico { width: 14px; height: 14px; color: var(--muted); }
+.year-chip[aria-expanded="true"] {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  color: var(--accent); visibility: hidden;
+}
+.year-chip[aria-expanded="true"] .ico { color: var(--accent); }
+
+.year-wheel {
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%); z-index: 40;
+  width: 132px; height: 240px; padding-top: 101px; padding-bottom: 101px;
+  overflow-y: auto; scrollbar-width: none;
+  border-radius: 14px; background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 14px 34px rgba(20, 24, 26, .18);
+  scroll-snap-type: y mandatory; scroll-behavior: smooth;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
+}
+.year-wheel::-webkit-scrollbar { display: none; }
+.yw-item {
+  display: block; height: 38px; line-height: 38px; text-align: center;
+  border-radius: 9px; font-size: 14px; color: var(--muted);
+  font-variant-numeric: tabular-nums; scroll-snap-align: center;
+  text-decoration: none;
+}
+.yw-item:hover { background: var(--surface-2); color: var(--ink); }
+.yw-item.is-current { background: var(--accent); color: var(--on-accent); font-weight: 650; }
+
+/* ---------- журнал: компактные ряды фильтров на телефоне ---------- */
+
+@media (max-width: 759px) {
+  .jrange > .jrange-seg {
+    display: flex; width: 100%; justify-content: stretch; gap: 2px;
+  }
+  .jrange > .jrange-seg .seg-link {
+    flex: 1 1 0; min-width: 0; white-space: nowrap;
+    padding: 7px 4px; font-size: 10.5px; overflow: hidden; text-overflow: ellipsis;
+  }
+  .jrange-export .jrange-actions { display: flex; gap: 6px; width: 100%; margin-left: 0; }
+  .jrange-export .jrange-actions > .btn { flex: 1 1 0; justify-content: center; min-width: 0; }
+  .jrange-export .jrange-actions > .btn-duo { flex: 0 0 96px; }
+}
+
+/* Поля периода на телефоне появляются только при выборе «Свой». */
+.seg-custom { display: none; }
+.d-short { display: none; }
+
+@media (max-width: 759px) {
+  .seg-custom { display: inline-flex; align-items: center; justify-content: center; }
+  .d-long { display: none; }
+  .d-short { display: inline; font-style: normal; }
+  .jrange-custom { display: none; }
+  .top-panel.range-open .jrange-custom {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 6px; align-items: center; width: 100%;
+  }
+  .top-panel.range-open .jrange-custom .jrange-range { display: contents; }
+  .top-panel.range-open .jrange-custom input[type="month"] {
+    width: 100%; min-width: 0; height: 38px; font-size: 12px; padding: 0 7px;
+  }
+  .jrange-custom > .btn { display: none; }
+}
+
+/* ---------- одна кнопка «печать + почта» ---------- */
+
+.btn-duo {
+  display: inline-flex; align-items: stretch; flex: none;
+  height: 36px; padding: 0 2px;
+  border: 1px solid var(--line-strong); border-radius: 10px;
+  background: var(--surface); overflow: hidden;
+}
+.btn-duo .bd-part {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 42px; border: 0; background: transparent;
+  color: var(--ink-2); cursor: pointer;
+}
+.btn-duo .bd-part + .bd-part::before {
+  content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 1px;
+  background: linear-gradient(180deg, transparent, var(--line-strong) 32%, var(--line-strong) 68%, transparent);
+}
+.btn-duo .bd-part:hover { color: var(--accent); }
+.btn-duo .bd-part .ico { width: 16px; height: 16px; }
+
+/* ---------- таблица «Итоги»: заголовки над числами ---------- */
+
+.jsum { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.jsum col.c-month { width: 40%; }
+.jsum col.c-num { width: 12%; }
+.jsum col.c-el { width: 36%; }
+.jsum th, .jsum td { border: 0; background: transparent; }
+.jsum th {
+  padding: 0 0 12px; text-align: right;
+  font-size: 10px; font-weight: 600; letter-spacing: .02em;
+  color: var(--faint); text-transform: none; white-space: nowrap;
+}
+.jsum th.mc { text-align: left; }
+.jsum td { padding: 13px 0; }
+.jsum td.mc { text-align: left; font-size: 13.5px; font-weight: 600; }
+.jsum td.num-cell { text-align: right; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.jsum tbody tr { border-bottom: 1px solid var(--line); }
+.jsum tbody tr:last-child { border-bottom: 0; }
+.jsum thead tr { border-bottom: 1px solid var(--line-strong); }
+.jsum tfoot tr { border-top: 1px solid var(--line-strong); }
+.jsum tfoot td { padding-top: 14px; font-weight: 600; }
+/* Пометка «авто» у расчётного счётчика: значение посчитано из дублирующего. */
+.meter-input.is-auto input {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+}
+.auto-tag {
+  position: absolute; right: 7px; top: -7px;
+  font-size: 8.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--accent); background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+  padding: 1px 5px; border-radius: 4px; line-height: 1.35;
+}
+
+/* Форма прибора: блок показаний дублирующего. */
+.dup-reads[hidden] { display: none; }
+.dup-delta {
+  margin: 2px 0 6px; padding: 9px 12px; border-radius: 10px;
+  background: var(--accent-soft); color: var(--accent);
+  font-size: 12.5px;
+}
+.dup-delta b { font-size: 15px; font-variant-numeric: tabular-nums; }
