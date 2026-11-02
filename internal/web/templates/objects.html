@@ -19,6 +19,9 @@
         </div>
         <span class="dot dot-{{statusClass .Status}}" aria-hidden="true"></span>
       </div>
+      {{if .Object.Note}}
+      <p class="object-note">{{.Object.Note}}</p>
+      {{end}}
       <div class="object-bottom">
         <span class="status">{{statusText .Status}}</span>
         <span class="object-meta">

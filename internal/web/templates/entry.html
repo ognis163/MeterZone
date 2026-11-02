@@ -46,13 +46,15 @@
             <span class="lbl">пред.</span>
             <span class="val">{{.PrevText}}</span>
           </div>
-          <label class="meter-input">
+          <label class="meter-input{{if .Auto}} is-auto{{end}}">
             <span class="sr-only">Текущие показания, {{.Meter.Title}}</span>
             <input type="text" inputmode="decimal" enterkeyhint="next" autocomplete="off"
                    name="v_{{.Meter.ID}}" value="{{.CurrText}}" placeholder="—"
                    data-prev="{{.PrevRaw}}" data-meter="{{.Meter.ID}}"
-                   {{if .IsSub}}data-parent-meter="{{.Meter.ParentID}}"{{end}}>
+                   {{if .Auto}}data-auto="1"{{end}}
+                   {{if .IsSub}}data-parent-meter="{{.Meter.ParentID}}" data-offset="{{.OffsetRaw}}"{{end}}>
             <span class="unit">{{$unit}}</span>
+            {{if .Auto}}<span class="auto-tag">авто</span>{{end}}
           </label>
           <div class="meter-diff">
             <span class="lbl">расход</span>

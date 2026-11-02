@@ -463,17 +463,12 @@
       var cells = qa(".month-cell", strip);
       var selected = q(".month-cell.is-selected", strip);
       if (!cells.length || !selected) return;
-      // В ленте месяц тянется по содержимому, поэтому ширину задаём явно:
-      // тогда все 12 месяцев ложатся в полосу без лишнего запаса, а прокрутка
-      // к выбранному месяцу считается по тем же размерам.
-      var gap = parseFloat(getComputedStyle(strip).columnGap) || 3;
-      var inner = strip.clientWidth;
-      if (inner > 0) {
-        var cell = Math.floor((inner - 2 - (cells.length - 1) * gap) / cells.length);
-        if (cell >= 40) strip.style.setProperty("--cell-w", cell + "px");
-      }
-      var target = Math.max(0, Math.min(selected.offsetLeft - 2, strip.scrollWidth - strip.clientWidth));
-      if (target > 0) strip.scrollLeft = target;
+      // Выбранный месяц ставим по центру. Крайние месяцы прижимаются к краю:
+      // левее января прокручивать нечего, и он остаётся слева целиком.
+      var max = strip.scrollWidth - strip.clientWidth;
+      if (max <= 0) return;
+      var target = selected.offsetLeft - (strip.clientWidth - selected.offsetWidth) / 2;
+      strip.scrollLeft = Math.max(0, Math.min(target, max));
     }
     // До первого кадра браузер ещё не знает ширину ленты — ждём раскладку.
     window.requestAnimationFrame(function () {
@@ -958,12 +953,21 @@
       function sync() {
         var v = parseNum(child.value);
         if (v == null) return;
-        var target = parent.getAttribute("data-auto") === "1" ? parent : null;
-        if (!target) return;
+        var manual = parent.getAttribute("data-auto") === "0";
+        var empty = String(parent.value).trim() === "";
+        if (manual && !empty) return; // расчётный правили руками — не трогаем
         parent.value = fmt(v + offset);
+        parent.setAttribute("data-auto", "1");
+        parent.classList.add("is-auto");
         parent.dispatchEvent(new Event("input", { bubbles: true }));
       }
       child.addEventListener("input", sync);
+      parent.addEventListener("input", function (e) {
+        if (e.isTrusted) parent.setAttribute("data-auto", "0");
+      });
+      if (parent.getAttribute("data-auto") === null && String(parent.value).trim() === "") {
+        parent.setAttribute("data-auto", "1");
+      }
     });
   }
 

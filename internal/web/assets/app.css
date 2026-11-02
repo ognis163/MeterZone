@@ -2727,12 +2727,10 @@ td.total-cell { white-space: nowrap; }
   scroll-snap-align: center; padding-bottom: 5px;
 }
 .month-ribbon .month-cell i { bottom: 6px; }
-.month-ribbon::before,
-.month-ribbon::after {
-  content: ""; position: sticky; z-index: 2; flex: 0 0 22px; pointer-events: none;
+.month-ribbon {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
 }
-.month-ribbon::before { left: 0; margin-right: -22px; background: linear-gradient(90deg, var(--surface), transparent); }
-.month-ribbon::after { right: 0; margin-left: -22px; background: linear-gradient(270deg, var(--surface), transparent); }
 
 /* ---------- телефон: кнопка года и колесо ---------- */
 
@@ -2835,8 +2833,10 @@ td.total-cell { white-space: nowrap; }
 }
 .btn-duo .bd-label { white-space: nowrap; }
 @media (max-width: 759px) {
-  .btn-duo .bd-part { padding: 0 10px; }
+  .btn-duo { padding: 0; }
+  .btn-duo .bd-part { padding: 0; min-width: 46px; gap: 0; }
   .btn-duo .bd-label { display: none; }
+  .jrange-export .jrange-actions > .btn-duo { flex: 0 0 92px; }
 }
 .btn-duo .bd-part + .bd-part::before {
   content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 1px;
@@ -2916,3 +2916,10 @@ td.total-cell { white-space: nowrap; }
   font-size: 12.5px;
 }
 .dup-delta b { font-size: 15px; font-variant-numeric: tabular-nums; }
+/* Заметка объекта — быстрый доступ прямо из списка. */
+.object-note {
+  margin: 8px 0 2px; padding: 7px 10px;
+  border-radius: 8px; background: var(--surface-2);
+  font-size: 12px; line-height: 1.45; color: var(--ink-2);
+  white-space: pre-line; overflow-wrap: anywhere;
+}

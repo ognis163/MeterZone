@@ -137,3 +137,15 @@ func FormatSigned(v float64) string {
 	}
 	return s
 }
+
+// ParseSignedValue разбирает число с явным знаком: «+30», «−30», «-30».
+func ParseSignedValue(raw string) (float64, error) {
+	s := strings.TrimSpace(strings.ReplaceAll(raw, "\u2212", "-"))
+	s = strings.ReplaceAll(s, " ", "")
+	s = strings.ReplaceAll(s, "\u00a0", "")
+	s = strings.TrimPrefix(s, "+")
+	if s == "" {
+		return 0, fmt.Errorf("пустое значение")
+	}
+	return ParseValue(s)
+}

@@ -81,19 +81,24 @@
           <div class="form-grid">
             <div class="field">
               <label for="read_ref">Показания расчётного</label>
-              <input id="read_ref" type="text" name="read_ref" value="{{fmtInput .RefReading}}"
+              <input id="read_ref" type="text" name="read_ref" value=""
                      inputmode="decimal" autocomplete="off" placeholder="например 12 780,0" data-dup-ref>
             </div>
             <div class="field">
               <label for="read_dup">Показания дублирующего</label>
-              <input id="read_dup" type="text" name="read_dup" value="{{fmtInput .DupReading}}"
+              <input id="read_dup" type="text" name="read_dup" value=""
                      inputmode="decimal" autocomplete="off" placeholder="например 12 810,0" data-dup-dup>
             </div>
+          </div>
+          <div class="field span-2">
+            <label for="offset_manual">Разница, кВт·ч</label>
+            <input id="offset_manual" type="text" name="offset_manual" value="{{if .Meter.OffsetSet}}{{fmtOffset .Meter.Offset}}{{end}}"
+                   inputmode="decimal" autocomplete="off" placeholder="например +30 или -30">
+            <p class="hint">Можно ничего не считать: укажите разницу вручную — она важнее показаний выше. Плюс — дублирующий больше расчётного.</p>
           </div>
           <p class="dup-delta" data-dup-delta {{if not .Meter.OffsetSet}}hidden{{end}}>
             Разница <b>{{.OffsetText}}</b> — {{.OffsetNote}}
           </p>
-          <p class="hint">Спишите оба счётчика: разница посчитается сама. В отчёт энергосбыта уходит только расчётный.</p>
         </div>
       </div>
     </div>

@@ -352,19 +352,23 @@ func (s *Server) handleMeterNew(w http.ResponseWriter, r *http.Request) {
 	meters, _ := s.Store.Meters(objectID, true)
 	base := s.base("Новый прибор", "objects")
 	s.withObjectContext(w, r, &base, obj.ID, "/")
-	s.render(w, http.StatusOK, "meter_form", meterFormData{
+	// Быстрое добавление дублирующего: /meters/new?object=N&parent=M&resource=energy
+	preset := model.Meter{ObjectID: obj.ID, Resource: model.WaterCold}
+	if v := strings.TrimSpace(r.URL.Query().Get("resource")); model.ValidResource(v) {
+		preset.Resource = model.Resource(v)
+	}
+	if v, err := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("parent")), 10, 64); err == nil && v > 0 {
+		preset.ParentID = v
+		preset.Resource = model.Energy
+	}
+	s.renderMeterForm(w, http.StatusOK, meterFormData{
 		Base:          base,
 		Object:        obj,
+		Meter:         preset,
 		IsNew:         true,
 		Resources:     model.ResourceOrder,
 		ParentOptions: activeParentOptions(meters, 0),
 		NextSort:      len(meters) + 1,
-		Meter: model.Meter{
-			ObjectID:    objectID,
-			Resource:    model.WaterCold,
-			Sort:        len(meters) + 1,
-			InstalledOn: "",
-		},
 	})
 }
 
@@ -480,6 +484,35 @@ func (s *Server) handleMeterSave(w http.ResponseWriter, r *http.Request) {
 		}
 		m.ParentID = parentID
 	}
+
+	// Разница дублирующего: вручную со знаком или из двух показаний.
+	offsetRaw := strings.TrimSpace(r.PostFormValue("offset_manual"))
+	refRaw := strings.TrimSpace(r.PostFormValue("read_ref"))
+	dupRaw := strings.TrimSpace(r.PostFormValue("read_dup"))
+	switch {
+	case m.ParentID != 0 && offsetRaw != "":
+		v, errOffset := model.ParseSignedValue(offsetRaw)
+		if errOffset != nil {
+			s.meterError(w, r, m, "Разница должна быть числом, например +30 или -30.")
+			return
+		}
+		m.Offset = model.Round3(v)
+		m.OffsetSet = true
+	case m.ParentID != 0 && refRaw != "" && dupRaw != "":
+		ref, errRef := model.ParseValue(refRaw)
+		dup, errDup := model.ParseValue(dupRaw)
+		if errRef != nil || errDup != nil {
+			s.meterError(w, r, m, "Показания расчётного и дублирующего должны быть числами.")
+			return
+		}
+		m.Offset = model.Round3(dup - ref)
+		m.OffsetSet = true
+	case m.ID != 0:
+		if old, err := s.Store.Meter(m.ID); err == nil && m.ParentID != 0 {
+			m.Offset, m.OffsetSet = old.Offset, old.OffsetSet
+		}
+	}
+
 	if m.ID != 0 {
 		for _, c := range meters {
 			if c.ParentID == m.ID && c.Resource != m.Resource {

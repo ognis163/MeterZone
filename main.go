@@ -22,7 +22,7 @@ import (
 	WebCl "indextro/internal/web"
 )
 
-const version = "1.5.2"
+const version = "1.5.3"
 
 //go:embed DejaVuSans.ttf
 var fontBytes []byte
@@ -67,11 +67,6 @@ func main() {
 	}
 
 	runtimePort := *port
-	if v := strings.TrimSpace(st.Setting("http_port", "")); v != "" {
-		if p, err := strconv.Atoi(v); err == nil && p > 0 && p <= 65535 {
-			runtimePort = p
-		}
-	}
 
 	srv, err := WebCl.New(st, loc, version, fontBytes, backups, runtimePort)
 	if err != nil {
@@ -87,7 +82,6 @@ func main() {
 	go backupLoop(st, backups, notify)
 
 	binder := newPortBinder(*host, srv.Handler())
-	srv.OnPortChange = binder.Change
 	if err := binder.Start(runtimePort); err != nil {
 		log.Fatalf("не удалось занять порт %d: %v", runtimePort, err)
 	}

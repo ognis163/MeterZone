@@ -141,7 +141,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /settings", s.handleSettings)
 	mux.HandleFunc("POST /settings/backup", s.handleBackupNow)
 	mux.HandleFunc("POST /settings/backup-email", s.handleBackupEmailSave)
-	mux.HandleFunc("POST /settings/port", s.handlePortSave)
 	mux.HandleFunc("GET /settings/backup/{name}", s.handleBackupDownload)
 	mux.HandleFunc("POST /settings/import", s.handleImport)
 	mux.HandleFunc("POST /settings/smtp", s.handleSMTPSave)
@@ -223,6 +222,7 @@ func flashFor(r *http.Request) string {
 func templateFuncs() template.FuncMap {
 	return template.FuncMap{
 		"fmtVal":     model.FormatValue,
+		"fmtOffset":  model.FormatSigned,
 		"fmtInput":   model.FormatInput,
 		"money":      model.FormatMoney,
 		"dateTimeRu": model.FormatDateTimeRu,
@@ -273,7 +273,7 @@ func templateFuncs() template.FuncMap {
 		// paytable принимает данные года для общего шаблона таблицы
 		// «Авансы и счета»: в журнале это .MoneyYearTable, на странице
 		// начислений — .moneyYearData.
-		"paytable": func(d moneyYearData) moneyYearData { return d },
+		"paytable":  func(d moneyYearData) moneyYearData { return d },
 		"kindLabel": model.KindLabel,
 	}
 }

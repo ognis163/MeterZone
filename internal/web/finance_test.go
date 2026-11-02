@@ -2,7 +2,6 @@ package web
 
 import (
 	"net/http"
-	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -39,27 +38,6 @@ func TestFinanceHidesMoneyPanel(t *testing.T) {
 	rr = request(t, h, http.MethodGet, "/?object="+itoa(obj.ID)+"&m=2026-10", nil, "")
 	if !strings.Contains(rr.Body.String(), "finance-panel") {
 		t.Fatal("при включённом финучёте блока денег нет")
-	}
-}
-
-func TestPortSetting(t *testing.T) {
-	srv, _, h := newTestServer(t)
-	form := url.Values{"port": {"19099"}}
-	rr := request(t, h, http.MethodPost, "/settings/port", form, "http://example.com")
-	if rr.Code != http.StatusSeeOther {
-		t.Fatalf("код %d: %s", rr.Code, rr.Body.String()[:min(300, rr.Body.Len())])
-	}
-	if srv.Port != 19099 {
-		t.Fatalf("порт в памяти %d", srv.Port)
-	}
-	if srv.Store.Setting("http_port", "") != "19099" {
-		t.Fatal("порт не сохранён")
-	}
-
-	bad := url.Values{"port": {"70000"}}
-	rr = request(t, h, http.MethodPost, "/settings/port", bad, "http://example.com")
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("некорректный порт: код %d", rr.Code)
 	}
 }
 

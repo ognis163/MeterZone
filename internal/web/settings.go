@@ -4,7 +4,6 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -98,43 +97,6 @@ func (s *Server) handleBackupNow(w http.ResponseWriter, r *http.Request) {
 	_, _ = s.Store.PruneBackups(s.BackupDir, 14)
 	s.NotifyBackup(b.Path)
 	s.redirect(w, r, "/settings?ok=backup")
-}
-
-func (s *Server) handlePortSave(w http.ResponseWriter, r *http.Request) {
-	if portLocked() {
-		s.settingsError(w, r, "Порт задаётся при запуске контейнера. Измените его в docker-compose.yml и перезапустите.")
-		return
-	}
-	if err := r.ParseForm(); err != nil {
-		s.settingsError(w, r, "Не удалось прочитать форму.")
-		return
-	}
-	port, err := strconv.Atoi(strings.TrimSpace(r.FormValue("port")))
-	if err != nil || port < 1 || port > 65535 {
-		s.settingsError(w, r, "Порт должен быть числом от 1 до 65535.")
-		return
-	}
-	old := s.Port
-	if port != old && s.OnPortChange != nil {
-		if err := s.OnPortChange(port); err != nil {
-			s.settingsError(w, r, "Не удалось открыть порт "+strconv.Itoa(port)+". Возможно, он занят.")
-			return
-		}
-	}
-	if err := s.Store.SetSetting("http_port", strconv.Itoa(port)); err != nil {
-		s.settingsError(w, r, "Не удалось сохранить порт.")
-		return
-	}
-	s.Port = port
-	if port == old || s.OnPortChange == nil {
-		s.redirect(w, r, "/settings?ok=port")
-		return
-	}
-	host := r.Host
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		host = h
-	}
-	http.Redirect(w, r, "http://"+net.JoinHostPort(host, strconv.Itoa(port))+"/settings?ok=port", http.StatusSeeOther)
 }
 
 func (s *Server) handleBackupEmailSave(w http.ResponseWriter, r *http.Request) {

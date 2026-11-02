@@ -259,9 +259,12 @@ type entryMeterView struct {
 	Net         bool
 	ParentTitle string
 	OffsetText  string
+	OffsetRaw   string
 	DerivedText string
 	HasOffset   bool
 	HasDerived  bool
+	// Auto — значение посчитано из дублирующего, его можно поправить руками.
+	Auto bool
 }
 
 // entrySectionView — зона одной плитки: вода (ХВС + ГВС) или электроэнергия.
@@ -398,18 +401,35 @@ func (s *Server) buildEntryData(r *http.Request, obj model.Object, period model.
 				continue
 			}
 			kv.ParentTitle = pv.Meter.Title()
+			// offset — сдвиг расчётного относительно дублирующего: расчётный = дубль + offset.
 			offset, ok := 0.0, false
-			if pv.HasPrev && kv.HasPrev {
+			switch {
+			case kv.Meter.OffsetSet:
+				offset, ok = -kv.Meter.Offset, true
+			case pv.HasPrev && kv.HasPrev:
 				offset, ok = model.Round3(pv.Prev-kv.Prev), true
-			} else if pv.Meter.StartValue > 0 && kv.Meter.StartValue > 0 {
+			case pv.Meter.StartValue > 0 && kv.Meter.StartValue > 0:
 				offset, ok = model.Round3(pv.Meter.StartValue-kv.Meter.StartValue), true
 			}
-			if ok {
-				kv.HasOffset = true
-				kv.OffsetText = model.FormatValue(offset)
-				if kv.HasCurr {
-					kv.HasDerived = true
-					kv.DerivedText = model.FormatValue(model.Round3(kv.Curr + offset))
+			if !ok {
+				continue
+			}
+			kv.HasOffset = true
+			kv.OffsetText = model.FormatValue(offset)
+			kv.OffsetRaw = strconv.FormatFloat(offset, 'f', -1, 64)
+			if !kv.HasCurr {
+				continue
+			}
+			kv.HasDerived = true
+			kv.DerivedText = model.FormatValue(model.Round3(kv.Curr + offset))
+			// Расчётный подставляем сами, если он ещё не введён.
+			if !pv.HasCurr && strings.TrimSpace(pv.CurrText) == "" {
+				pv.Curr = model.Round3(kv.Curr + offset)
+				pv.CurrText = model.FormatInput(pv.Curr)
+				pv.Auto = true
+				if pv.HasPrev && pv.Curr >= pv.Prev {
+					pv.Diff = model.Round3(pv.Curr - pv.Prev)
+					pv.HasDiff = true
 				}
 			}
 		}
