@@ -162,9 +162,11 @@
                 {{.Resource.Label}}{{if .Detail}} · {{.Detail}}{{end}}{{if .StartValue}} · старт {{fmtVal .StartValue}}{{end}}
               </span>
             </span>
-            <a class="iconbtn" href="/meters/new?object={{$.Object.ID}}&parent={{.ID}}&resource=energy"
-               aria-label="Добавить дублирующий" title="Добавить дублирующий счётчик"
-               {{if or .IsSub (not .Resource.IsEnergy)}}hidden{{end}}>{{template "icon-plus"}}</a>
+            {{/* Дублирующий добавляется здесь же, в карточке объекта: открываем
+                 встроенную форму прибора, а не отдельную страницу. */}}
+            <button class="iconbtn" type="button" data-meter-dup="{{.ID}}"
+                    aria-label="Добавить дублирующий" title="Добавить дублирующий счётчик"
+                    {{if or .IsSub (not .Resource.IsEnergy)}}hidden{{end}}>{{template "icon-plus"}}</button>
             <button class="iconbtn" type="button" data-meter-edit="{{.ID}}" aria-label="Изменить прибор">{{template "icon-pencil"}}</button>
             <form method="post" action="/meters/{{.ID}}/delete" class="meter-del"
                   data-confirm="Удалить прибор «{{.Title}}»? Введённые показания останутся в истории объекта.">

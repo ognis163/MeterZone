@@ -601,8 +601,13 @@
       var defaults = form ? form.innerHTML : "";
 
       function open(mode, data) {
+        data = data || {};
+        var isDup = mode === "new" && data.parent_id && String(data.parent_id) !== "0";
         panel.classList.add("is-open");
-        if (title) title.textContent = mode === "edit" ? "Изменить прибор" : "Новый прибор";
+        if (title) {
+          title.textContent = mode === "edit" ? "Изменить прибор"
+            : (isDup ? "Дублирующий счётчик" : "Новый прибор");
+        }
         if (saveBtn) saveBtn.textContent = mode === "edit" ? "Сохранить прибор" : "Добавить прибор";
         if (openBtn) openBtn.style.display = mode === "edit" ? "none" : "";
         if (mode === "edit") {
@@ -616,10 +621,16 @@
           setVal("parent_id", data.parent_id);
           setVal("finance_mode", data.finance_mode);
           setVal("sort", data.sort);
+        } else {
+          if (idField) idField.value = "0";
+          if (data.resource) setVal("resource", data.resource);
+          setVal("label", data.label || "");
+          setVal("parent_id", data.parent_id || "0");
         }
+        if (window.__meterDupSync && form) window.__meterDupSync(form);
         var first = q("select, input[type=text]", panel);
         if (first && mode === "edit") first.focus();
-        panel.scrollIntoView({ block: "center", behavior: "smooth" });
+        panel.scrollIntoView({ block: mode === "edit" ? "center" : "start", behavior: "smooth" });
       }
 
       function setVal(name, value) {
@@ -660,6 +671,20 @@
             parent_id: row ? (row.getAttribute("data-parent") || "0") : "0",
             finance_mode: row ? (row.getAttribute("data-finance") || "none") : "none",
             sort: row ? (row.getAttribute("data-sort") || "0") : "0"
+          });
+        });
+      });
+
+      // «+ дублирующий» у прибора: открываем ту же форму здесь, в карточке
+      // объекта, с уже выбранным расчётным счётчиком. Отдельная страница
+      // не нужна — основные блоки объекта остаются на месте.
+      qa("[data-meter-dup]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var row = btn.closest(".meter-row");
+          open("new", {
+            resource: "energy",
+            parent_id: btn.getAttribute("data-meter-dup") || "0",
+            label: row ? (row.getAttribute("data-label") || "") : ""
           });
         });
       });
@@ -942,6 +967,26 @@
     });
   }
 
+  // --- выбор года в журнале ----------------------------------------------
+  var jyBtn = q("[data-jyear-toggle]");
+  var jyPop = q("[data-jyear-pop]");
+  if (jyBtn && jyPop) {
+    function jyOpen(show) {
+      jyPop.hidden = !show;
+      jyBtn.setAttribute("aria-expanded", show ? "true" : "false");
+    }
+    jyBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      jyOpen(jyPop.hidden);
+    });
+    document.addEventListener("click", function (e) {
+      if (!jyPop.hidden && !jyPop.contains(e.target) && !jyBtn.contains(e.target)) jyOpen(false);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") jyOpen(false);
+    });
+  }
+
   // --- автоподстановка расчётного из дублирующего ------------------------
   var subs = qa(".meter-input input[data-parent-meter]");
   if (subs.length) {
@@ -971,23 +1016,21 @@
     });
   }
 
-  // --- форма прибора: показания дублирующего -----------------------------
-  var sel = q("[data-dup-select]");
-  var box = q("[data-dup-reads]");
-  if (sel && box) {
-    function refresh() {
-      box.hidden = sel.value === "0" || sel.value === "";
+  // --- форма прибора: дублирующий счётчик --------------------------------
+  // Обработчики делегированы документу: встроенная форма прибора в карточке
+  // объекта пересоздаётся, и прямые обработчики на её полях терялись.
+  var dupSync = (function () {
+    function formOf(el) {
+      return (el && el.closest && el.closest("form")) || document;
     }
-    sel.addEventListener("change", refresh);
-    refresh();
 
-    var ref = q("[data-dup-ref]");
-    var dup = q("[data-dup-dup]");
-    var delta = q("[data-dup-delta]");
-    function updateDelta() {
+    function updateDelta(form) {
+      var delta = q("[data-dup-delta]", form);
       if (!delta) return;
+      var ref = q("[data-dup-ref]", form);
+      var sub = q("[data-dup-dup]", form);
       var a = parseNum(ref && ref.value);
-      var b = parseNum(dup && dup.value);
+      var b = parseNum(sub && sub.value);
       if (a == null || b == null) { delta.hidden = true; return; }
       var d = Math.round((b - a) * 1000) / 1000;
       var sign = d > 0 ? "+" : (d < 0 ? "−" : "");
@@ -996,24 +1039,39 @@
       delta.hidden = false;
       delta.innerHTML = "Разница <b>" + sign + fmt(Math.abs(d)) + "</b> — " + note;
     }
-    if (ref) ref.addEventListener("input", updateDelta);
-    if (dup) dup.addEventListener("input", updateDelta);
-    updateDelta();
-  }
-})();
-/* Блок дублирующего счётчика показываем только для электроэнергии. */
-(function () {
-  "use strict";
-  var block = document.querySelector("[data-dup-block]");
-  var resource = document.querySelector('select[name="resource"]');
-  if (!block || !resource) return;
-  var sel = document.querySelector("[data-dup-select]");
-  function refresh() {
-    var isEnergy = resource.value === "energy";
-    block.hidden = !isEnergy;
-    if (!isEnergy && sel) sel.value = "0";
-    if (sel) sel.dispatchEvent(new Event("change", { bubbles: true }));
-  }
-  resource.addEventListener("change", refresh);
-  refresh();
+
+    function sync(form) {
+      form = form || document;
+      var block = q("[data-dup-block]", form);
+      if (!block) return;
+      var resource = q('select[name="resource"]', form);
+      var sel = q("[data-dup-select]", form);
+      var reads = q("[data-dup-reads]", form);
+      if (resource) {
+        var isEnergy = resource.value === "energy";
+        block.hidden = !isEnergy;
+        if (!isEnergy && sel) sel.value = "0";
+      }
+      if (reads && sel) reads.hidden = sel.value === "0" || sel.value === "";
+      updateDelta(form);
+    }
+
+    document.addEventListener("change", function (e) {
+      var t = e.target;
+      if (!t || !t.matches) return;
+      if (t.matches('select[name="resource"], [data-dup-select]')) sync(formOf(t));
+    });
+    document.addEventListener("input", function (e) {
+      var t = e.target;
+      if (!t || !t.matches) return;
+      if (t.matches("[data-dup-ref], [data-dup-dup]")) updateDelta(formOf(t));
+    });
+
+    // Страницы с готовой формой прибора: приводим блок к текущему ресурсу.
+    qa("form").forEach(function (f) {
+      if (q("[data-dup-block]", f)) sync(f);
+    });
+    return sync;
+  })();
+  window.__meterDupSync = dupSync;
 })();

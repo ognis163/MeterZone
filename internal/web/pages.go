@@ -770,12 +770,15 @@ type journalCellView struct {
 
 // journalRangeView — быстрый выбор периода в журнале.
 type journalRangeView struct {
-	Label  string
-	Href   string
-	Active bool
-	From   model.Period
-	To     model.Period
-	Wide   bool // на телефоне не показываем: не помещается в строку
+	Label   string
+	LabelSm string // короткая подпись на телефоне (пусто — та же, что Label)
+	Href    string
+	Active  bool
+	From    model.Period
+	To      model.Period
+	Wide    bool // на телефоне не показываем: не помещается в строку
+	// DesktopOnly — на телефоне скрываем, чтобы остались три понятных варианта.
+	DesktopOnly bool
 }
 
 // journalTotalView — итог по ресурсу за выбранный период.
@@ -841,12 +844,36 @@ type journalPageData struct {
 	// RangeOpen — открыты поля произвольного периода ("Свой").
 	RangeOpen bool
 	RangeHref string
+	// CustomActive — выбранный период не совпал ни с одной быстрой кнопкой:
+	// на телефоне подсвечиваем «Период», иначе выбор выглядел бы пустым.
+	CustomActive bool
 
 	StatementHref string
 
 	// Выгрузка выбранного объекта и периода из журнала.
 	CSVHref    string
 	DocPDFHref string
+
+	// Верхний блок: год, режимы периода и лента месяцев.
+	Years       []yearOptionView
+	Ribbon      []ribbonMonthView
+	MonthHref   string
+	YearHref    string
+	TwoHref     string
+	PrevRibbon  string
+	NextRibbon  string
+	ModeMonth   bool
+	ModeYear    bool
+	ModeTwo     bool
+	ModeRange   bool
+	SingleMonth bool
+
+	// Новые таблицы «Итоги» и «Начисления».
+	MonthRows  []journalResRow
+	YearTable  journalYearView
+	MoneyRows  []moneyResRow
+	MoneyTotal moneyResRow
+	MoneyYear  moneyYearView
 }
 
 func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
@@ -1034,6 +1061,23 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 	data.MoneyDue = model.FormatMoney(due)
 	data.MoneyAny = len(data.MoneyTable.Months) > 0
 	data.MoneyEnabled = data.MoneyTable.Enabled
+
+	monthsWithData := map[string]bool{}
+	for _, byMonth := range od.Readings {
+		for key := range byMonth {
+			if p, err := model.ParsePeriod(key); err == nil {
+				monthsWithData[p.String()] = true
+			}
+		}
+	}
+	data.Years, data.Ribbon, data.MonthHref, data.YearHref, data.TwoHref,
+		data.PrevRibbon, data.NextRibbon, data.ModeMonth, data.ModeYear, data.ModeTwo =
+		buildJournalNav(obj.ID, scope, from, to, year, today, dupOn, monthsWithData)
+	data.ModeRange = !data.ModeMonth && !data.ModeYear && !data.ModeTwo
+	data.SingleMonth = from == to
+	data.MonthRows = buildMonthRows(rows)
+	data.YearTable = buildJournalYear(rows, resources, data.Totals, dupOn)
+	data.MoneyRows, data.MoneyTotal, data.MoneyYear = buildMoneyViews(data.MoneyTable, obj.ID, scope, dupOn)
 	data.MoneyHref = reportPreviewHref(obj.ID, "charges", scope, to, from, to)
 	// Ссылки внутри журнала сохраняют объект, диапазон и фильтр.
 	hrefFor := func(f, t model.Period, sc string) string {
@@ -1064,14 +1108,22 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 	}
 	data.Ranges = []journalRangeView{
 		{Label: "Этот месяц", Href: hrefFor(today, today, scope), From: today, To: today},
-		{Label: "Этот год", Href: hrefFor(thisYear(today), endYear(today), scope), From: thisYear(today), To: endYear(today)},
-		{Label: "С начала года", Href: hrefFor(thisYear(today), today, scope), From: thisYear(today), To: today},
+		{Label: "Этот год", LabelSm: "Год", Href: hrefFor(thisYear(today), endYear(today), scope), From: thisYear(today), To: endYear(today)},
+		{Label: "С начала года", Href: hrefFor(thisYear(today), today, scope), From: thisYear(today), To: today, DesktopOnly: true},
 		{Label: "Прошлый год", Href: hrefFor(lastYear, lastYearEnd, scope), From: lastYear, To: lastYearEnd, Wide: true},
 		{Label: "2 года", Href: hrefFor(lastYear, endYear(today), scope), From: lastYear, To: endYear(today), Wide: true},
 	}
+	// На телефоне часть кнопок скрыта (Wide/DesktopOnly): если выбранный
+	// период совпал только с такой, подсвечиваем «Период».
+	anyVisibleRange := false
 	for i := range data.Ranges {
-		data.Ranges[i].Active = from == data.Ranges[i].From && to == data.Ranges[i].To
+		r := &data.Ranges[i]
+		r.Active = from == r.From && to == r.To
+		if r.Active && !r.Wide && !r.DesktopOnly {
+			anyVisibleRange = true
+		}
 	}
+	data.CustomActive = !anyVisibleRange
 	data.Object = obj
 	data.Year = year
 	data.PrevYear = year - 1

@@ -7,16 +7,42 @@
 </section>
 {{else}}
 <section class="top-panel journal-top{{if .RangeOpen}} range-open{{end}}">
-  {{template "objectseg" .}}
+  <div class="jt-row jt-obj">
+    {{template "objectseg" .}}
+  </div>
 
-  <div class="jrange">
-    <span class="jrange-cap">Период</span>
-    <div class="segmented jrange-seg">
-      {{range .Ranges}}
-      <a class="seg-link{{if .Active}} is-active{{end}}{{if .Wide}} hide-sm{{end}}" href="{{.Href}}"{{if .Active}} aria-current="true"{{end}}>{{.Label}}</a>
-      {{end}}
-      <a class="seg-link seg-custom{{if .RangeOpen}} is-active{{end}}" href="{{.RangeHref}}">Свой</a>
+  <div class="jt-row jt-period">
+    <div class="year-pick">
+      <button class="year-btn" type="button" data-jyear-toggle aria-expanded="false" aria-haspopup="listbox">
+        <span>{{.Year}}</span>
+        <svg class="year-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="m3 4.5 3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="year-pop" data-jyear-pop hidden role="listbox">
+        {{range .Years}}
+        <a class="year-item{{if .Current}} is-on{{end}}" href="{{.Href}}"{{if .Current}} aria-current="true"{{end}}>{{.Year}}</a>
+        {{end}}
+      </div>
     </div>
+
+    <div class="segmented jt-modes">
+      <a class="seg-link{{if .ModeMonth}} is-active{{end}}" href="{{.MonthHref}}">Месяц</a>
+      <a class="seg-link{{if .ModeYear}} is-active{{end}}" href="{{.YearHref}}">Год</a>
+      <a class="seg-link{{if .ModeTwo}} is-active{{end}}" href="{{.TwoHref}}">2 года</a>
+      <a class="seg-link{{if .ModeRange}} is-active{{end}}" href="{{.RangeHref}}">Диапазон</a>
+    </div>
+
+    {{if .ModeMonth}}
+    <div class="jt-ribbon">
+      <a class="jt-nav" href="{{.PrevRibbon}}" aria-label="Предыдущий месяц">{{template "icon-left"}}</a>
+      <div class="jt-months">
+        {{range .Ribbon}}
+        <a class="jt-month{{if .Current}} is-active{{end}}" href="{{.Href}}"{{if .Current}} aria-current="true"{{end}}>{{.Label}}</a>
+        {{end}}
+      </div>
+      <a class="jt-nav" href="{{.NextRibbon}}" aria-label="Следующий месяц">{{template "icon-right"}}</a>
+    </div>
+    {{end}}
+
     <form method="get" action="/journal" class="jrange-custom">
       <input type="hidden" name="object" value="{{.Object.ID}}">
       {{if ne .Scope "all"}}<input type="hidden" name="scope" value="{{.Scope}}">{{end}}
@@ -30,32 +56,18 @@
     </form>
   </div>
 
-  <div class="jrange jrange-scope">
-    <span class="jrange-cap">Что включить</span>
-    <div class="segmented jrange-seg">
-      <a class="seg-link{{if eq .Scope "all"}} is-active{{end}}" href="{{.ScopeAllHref}}"{{if eq .Scope "all"}} aria-current="true"{{end}}>Всё</a>
+  <div class="jt-row jt-data">
+    <div class="segmented">
+      <a class="seg-link{{if eq .Scope "all"}} is-active{{end}}" href="{{.ScopeAllHref}}"{{if eq .Scope "all"}} aria-current="true"{{end}}>Все</a>
       <a class="seg-link{{if eq .Scope "water"}} is-active{{end}}" href="{{.ScopeWaterHref}}"{{if eq .Scope "water"}} aria-current="true"{{end}}>Вода</a>
       <a class="seg-link{{if eq .Scope "energy"}} is-active{{end}}" href="{{.ScopeEnergyHref}}"{{if eq .Scope "energy"}} aria-current="true"{{end}}>Электро</a>
     </div>
     <a class="dup-btn{{if .DupOn}} is-on{{end}}" href="{{.DupHref}}"{{if .DupOn}} aria-current="true"{{end}}>
       {{if .DupOn}}{{template "icon-check"}}{{else}}{{template "icon-plus"}}{{end}}
-      Дубль. Счетчик
+      Дубль
     </a>
   </div>
-
-  <div class="jrange jrange-export">
-    <span class="jrange-cap">Выгрузка</span>
-    <div class="jrange-actions">
-      <a class="btn btn-ghost btn-sm" href="{{.CSVHref}}">{{template "icon-download"}} CSV</a>
-      <a class="btn btn-ghost btn-sm" href="{{.DocPDFHref}}">{{template "icon-report"}} PDF</a>
-      <div class="btn-duo">
-        <a class="bd-part" href="{{.StatementHref}}" title="Печать">{{template "icon-print"}}<span class="bd-label">Печать</span></a>
-        <a class="bd-part" href="{{.StatementHref}}#send" title="Отправить на почту">{{template "icon-mail"}}<span class="bd-label">email</span></a>
-      </div>
-    </div>
-  </div>
 </section>
-
 
 {{if not .HasData}}
 <section class="empty-card">
@@ -80,41 +92,148 @@
 {{end}}
 
 {{if .HasMonths}}
-{{/* «Итоги» — та же сетка, что у начислений: месяц, колонки по ресурсам,
-     справа «Печать/отправить» — печатный лист за выбранный период. */}}
-<section class="panel money-table-panel">
+<section class="panel journal-panel">
   <div class="section-head">
-    <h2>Итоги за {{.RangeLabel}}</h2>
+    <h2 class="ph"><span class="ph-main">Итоги</span><span class="ph-sub">{{.RangeLabel}}</span></h2>
     <div class="section-head-side">
-      {{template "joursummary" .JournalTable}}
-      <a class="btn btn-ghost btn-sm" href="{{.JournalTable.StatementHref}}">{{template "icon-print"}} Печать/отправить</a>
+      <div class="panel-io">
+        <a class="iconbtn" href="{{.CSVHref}}" title="Скачать CSV" aria-label="Скачать CSV">{{template "icon-download"}}</a>
+        <a class="iconbtn" href="{{.DocPDFHref}}" title="Скачать PDF" aria-label="Скачать PDF">{{template "icon-report"}}</a>
+        <a class="btn-duo" href="{{.StatementHref}}" title="Документ: печать и отправка на почту">
+          <span class="bd-part">{{template "icon-print"}}<span class="bd-label">Печать</span></span>
+          <span class="bd-part">{{template "icon-mail"}}<span class="bd-label">Отправить</span></span>
+        </a>
+      </div>
     </div>
   </div>
-  {{template "jourtable" .JournalTable}}
-  <p class="hint jscroll-hint">На телефоне таблицу можно прокручивать вбок.</p>
-  <p class="hint">Показания — счётчик на конец месяца, расход — сколько израсходовано за месяц. Нажмите на месяц, чтобы внести или исправить данные.</p>
+
+  {{if .SingleMonth}}
+  <div class="gwrap">
+    <table class="gtable">
+      <colgroup><col class="c-name"><col span="2"></colgroup>
+      <thead>
+        <tr class="sub">
+          <th>Ресурс</th>
+          <th>Показание</th>
+          <th>Расход</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .MonthRows}}
+        <tr><td>{{.Label}}</td><td>{{.Reading}}</td><td>{{.Consumption}}</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  <p class="hint">Показания — счётчик на конец месяца, расход — сколько израсходовано за месяц.</p>
+  {{else}}
+  <div class="gwrap scroll">
+    <table class="gtable v3 wide">
+      <colgroup>
+        <col class="c-month"><col class="c-gap">
+        {{range $i, $g := .YearTable.Groups}}
+        <col class="c-n"><col class="c-n">{{if $g.Dup}}<col class="c-n">{{end}}{{if lt $i (sub (len $.YearTable.Groups) 1)}}<col class="c-gap">{{end}}
+        {{end}}
+      </colgroup>
+      <thead>
+        <tr class="grp">
+          <th></th><th class="gap"></th>
+          {{range $i, $g := .YearTable.Groups}}
+          <th class="pair" colspan="{{if $g.Dup}}3{{else}}2{{end}}">{{$g.Name}}</th>
+          {{if lt $i (sub (len $.YearTable.Groups) 1)}}<th class="gap"></th>{{end}}
+          {{end}}
+        </tr>
+        <tr class="sub">
+          <th class="mhead">Месяц</th><th class="gap"></th>
+          {{range $i, $g := .YearTable.Groups}}
+          <th>Показание</th><th>Расход</th>{{if $g.Dup}}<th>Дубль</th>{{end}}
+          {{if lt $i (sub (len $.YearTable.Groups) 1)}}<th class="gap"></th>{{end}}
+          {{end}}
+        </tr>
+      </thead>
+      <tbody>
+        {{range $r := .YearTable.Rows}}
+        <tr{{if $r.Current}} class="cur"{{end}}>
+          <td>{{if $r.Href}}<a class="jmonth-link" href="{{$r.Href}}">{{$r.Label}}</a>{{else}}{{$r.Label}}{{end}}</td>
+          <td class="gap"></td>
+          {{range $i, $cells := $r.Groups}}
+          {{range $cells}}<td class="num">{{.}}</td>{{end}}
+          {{if lt $i (sub (len $.YearTable.Groups) 1)}}<td class="gap"></td>{{end}}
+          {{end}}
+        </tr>
+        {{end}}
+      </tbody>
+      {{if .YearTable.Foot}}
+      <tfoot>
+        <tr>
+          <td>Итого</td><td class="gap"></td>
+          {{range $i, $cells := .YearTable.Foot}}
+          {{range $cells}}<td class="num">{{.}}</td>{{end}}
+          {{if lt $i (sub (len $.YearTable.Groups) 1)}}<td class="gap"></td>{{end}}
+          {{end}}
+        </tr>
+      </tfoot>
+      {{end}}
+    </table>
+  </div>
+  <p class="hint">Показания — счётчик на конец месяца, расход — сколько израсходовано за месяц. В «Итого» — расход за период. Нажмите на месяц, чтобы внести данные.</p>
+  {{end}}
 </section>
 {{end}}
 
-{{/* Начисления: одна таблица на все ресурсы — в каждой строке месяц,
-     ресурс, аванс, счёт и итого. Блок есть, только если у прибора
-     включён финансовый учёт. */}}
-<section class="panel money-panel" data-pay-panel data-object="{{.Object.ID}}">
+<section class="panel money-panel journal-panel" data-pay-panel data-object="{{.Object.ID}}">
   <div class="section-head">
-    <h2>Начисления за {{.RangeLabel}}</h2>
+    <h2 class="ph"><span class="ph-main">Начисления</span><span class="ph-sub">{{.RangeLabel}}</span></h2>
     <div class="section-head-side">
-      <div class="sum">
-        <span class="p">Оплачено: <b data-pay-paid>{{.MoneyPaid}}</b></span>
-        <span class="d">К оплате: <b data-pay-due>{{.MoneyDue}}</b></span>
+      <div class="panel-io">
+        <a class="btn-duo" href="{{.MoneyHref}}" title="Документ: печать и отправка на почту">
+          <span class="bd-part">{{template "icon-print"}}<span class="bd-label">Печать</span></span>
+          <span class="bd-part">{{template "icon-mail"}}<span class="bd-label">Отправить</span></span>
+        </a>
       </div>
-      <a class="btn btn-ghost btn-sm" href="{{.MoneyHref}}">{{template "icon-print"}} Печать/отправить</a>
     </div>
   </div>
+
   {{if .MoneyAny}}
+  {{if .SingleMonth}}
   <div class="money-wrap" data-money-grid data-object="{{.Object.ID}}">
     {{template "moneytable" .MoneyTable}}
   </div>
-  <p class="hint">Суммы сохраняются сами. Галочка у суммы отмечает оплату по отдельности — аванс или счёт; «Итого» отмечает обе позиции сразу.</p>
+  <p class="hint">Суммы сохраняются сами. Галочка отмечает оплату по отдельности — аванс или счёт; «Итого» отмечает обе позиции сразу.</p>
+  {{else}}
+  <div class="gwrap scroll">
+    <table class="gtable money-year wide">
+      <colgroup>
+        <col class="c-month"><col class="c-gap">
+        {{range $i, $a := .MoneyYear.Accounts}}<col class="c-nm">{{end}}<col class="c-nm">
+      </colgroup>
+      <thead>
+        <tr class="sub">
+          <th class="mhead">Месяц</th><th class="gap"></th>
+          {{range .MoneyYear.Accounts}}<th>{{.}}</th>{{end}}
+          <th>Итого</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .MoneyYear.Rows}}
+        <tr>
+          <td>{{if .Href}}<a class="jmonth-link" href="{{.Href}}">{{.Label}}</a>{{else}}{{.Label}}{{end}}</td>
+          <td class="gap"></td>
+          {{range .Cells}}<td class="num">{{.}}</td>{{end}}
+          <td class="num">{{.Total}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td>Итого</td><td class="gap"></td>
+          {{range .MoneyYear.Foot}}<td class="num">{{.}}</td>{{end}}
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  <p class="hint">Начисления за период по месяцам. Нажмите на месяц, чтобы изменить суммы.</p>
+  {{end}}
   {{else if .MoneyEnabled}}
   <p class="hint">По выбранному фильтру начислений нет — выберите «Всё» или другой вид ресурса.</p>
   {{else}}

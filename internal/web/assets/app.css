@@ -397,7 +397,9 @@ input[type="file"]::file-selector-button {
 }
 .segmented label { flex: 1; position: relative; }
 .segmented input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; }
-.segmented span {
+/* Только для старой разметки «label + input + span»: ссылки-плитки
+   (`.seg-link`) внутри такого контейнера должны остаться инлайновыми. */
+.segmented label span {
   display: block; text-align: center; padding: 10px 8px;
   border-radius: 9px; font-size: 13.5px; color: var(--muted);
   transition: background .12s ease, color .12s ease;
@@ -1720,7 +1722,7 @@ input:disabled, select:disabled { opacity: .55; cursor: not-allowed; }
 .jtotal .jread { font-weight: 400; font-size: 10.5px; color: var(--muted); opacity: .8; }
 .jtotal .jcons { font-size: 14px; font-weight: 650; opacity: 1; color: var(--ink); }
 /* ---------- приборы внутри карточки объекта ---------- */
-.meter-inline { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.meter-inline { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); scroll-margin-top: 68px; }
 .meter-inline.is-open { display: block; }
 .meter-inline-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .meter-inline-head h3 { margin: 0; font-size: 13px; letter-spacing: -.01em; }
@@ -2922,4 +2924,269 @@ td.total-cell { white-space: nowrap; }
   border-radius: 8px; background: var(--surface-2);
   font-size: 12px; line-height: 1.45; color: var(--ink-2);
   white-space: pre-line; overflow-wrap: anywhere;
+}
+
+/* ==========================================================================
+   Журнал: печать/почта одной кнопкой, период и фильтры на телефоне
+   ========================================================================== */
+
+/* Кнопка «Печать | email» — один элемент и один переход: черта только
+   разделяет слова, нажимается вся плитка. Ширина по содержимому. */
+.btn-duo { flex: 0 0 auto; width: auto; max-width: 100%; white-space: nowrap; }
+.btn-duo .bd-part { cursor: inherit; }
+.btn-duo .bd-part .ico { flex: none; }
+
+@media (max-width: 759px) {
+  /* Только три понятных периода: месяц, год и произвольный диапазон. */
+  .only-desktop { display: none !important; }
+
+  /* Как у выбора объекта: белая плитка не липнет к краю серой подложки. */
+  .top-panel .segmented { padding: 4px; gap: 4px; }
+  .top-panel .jrange-seg .seg-link { padding: 8px 6px; }
+  .jrange > .jrange-seg .seg-link { font-size: 11.5px; }
+
+  /* «Дубль. Счетчик» — маленькая второстепенная кнопка, не на всю строку. */
+  .jrange-scope { justify-items: stretch; }
+  .dup-btn {
+    justify-self: end; width: auto;
+    min-height: 30px; padding: 0 10px; gap: 5px;
+    border-style: solid; border-color: var(--line);
+    background: var(--surface); color: var(--muted);
+    font-size: 11px; font-weight: 600;
+  }
+  .dup-btn .ico { width: 12px; height: 12px; }
+  .dup-btn.is-on {
+    background: transparent; color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+  }
+
+  /* «Период»: поля «с какого по какой» и кнопка «Показать» на телефоне. */
+  .jrange > .jrange-seg { order: 1; }
+  .top-panel.range-open .jrange-custom {
+    order: 2;
+    grid-template-areas: "from dash to" "btn btn btn";
+    margin-top: 2px;
+  }
+  .top-panel.range-open .jrange-custom > .btn {
+    display: inline-flex; grid-area: btn;
+    align-items: center; justify-content: center;
+    width: 100%; min-height: 40px; margin: 0;
+  }
+}
+
+/* Планшет: фильтры периода не наезжают на поля диапазона. */
+@media (min-width: 760px) and (max-width: 1099px) {
+  .top-panel .jrange { flex-wrap: wrap; row-gap: 8px; }
+  .jrange-custom { margin-left: 0; }
+}
+/* ======================================================================
+   Журнал 1.5.4: верхний блок в три строки и таблицы в стиле «Сведений»
+   ====================================================================== */
+
+.journal-top { display: block; padding: 0; gap: 0; }
+.jt-row { padding: 10px 12px; min-width: 0; }
+.jt-row + .jt-row { border-top: 1px solid var(--line); }
+.jt-obj { padding: 8px 10px; }
+.jt-obj .segmented { width: 100%; }
+
+.jt-period { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+.year-pick { position: relative; flex: 0 0 auto; }
+.year-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 34px; padding: 0 10px 0 12px;
+  border: 1px solid var(--line-strong); border-radius: 10px;
+  background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.year-btn:hover { border-color: var(--accent); }
+.year-caret { width: 12px; height: 12px; color: var(--muted); }
+.year-pop {
+  position: absolute; z-index: 30; top: calc(100% + 6px); left: 0;
+  min-width: 104px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; box-shadow: 0 12px 30px rgba(0, 0, 0, .12);
+}
+.year-item {
+  display: block; padding: 7px 10px; border-radius: 8px;
+  font-size: 12.5px; color: var(--ink-2); text-align: center;
+}
+.year-item:hover { background: var(--surface-2); }
+.year-item.is-on { background: var(--accent); color: #fff; font-weight: 600; }
+
+.journal-top .jt-modes { flex: 0 0 auto; width: auto; }
+.jt-modes .seg-link { padding: 8px 10px; font-size: 12px; }
+
+.jt-ribbon { display: flex; align-items: center; gap: 6px; flex: 1 1 320px; min-width: 0; }
+.jt-nav {
+  width: 28px; height: 28px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px; color: var(--muted);
+}
+.jt-nav:hover { background: var(--surface-2); color: var(--ink); }
+.jt-nav .ico { width: 14px; height: 14px; }
+.jt-months { flex: 1 1 0; min-width: 0; display: flex; gap: 2px; overflow: hidden; }
+.jt-month {
+  flex: 1 1 0; text-align: center; padding: 8px 4px; border-radius: 9px;
+  font-size: 12px; color: var(--muted); white-space: nowrap;
+}
+.jt-month:hover { background: var(--surface-2); color: var(--ink); }
+.jt-month.is-active { background: var(--surface-2); color: var(--ink); font-weight: 600; }
+
+.jt-data { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.journal-top .jt-data .segmented { flex: 0 0 auto; width: auto; }
+
+.journal-top .jrange-custom { display: none; }
+.journal-top.range-open .jrange-custom { display: flex; align-items: center; gap: 8px; flex: 1 1 100%; }
+
+/* ---------- заголовки панелей в две строки + действия ---------- */
+
+.section-head .ph { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.ph-main { font-size: 15px; font-weight: 600; letter-spacing: -.012em; line-height: 1.2; }
+.ph-sub { font-size: 12.5px; color: var(--muted); font-weight: 500; line-height: 1.25; }
+.panel-io { display: flex; align-items: center; gap: 6px; }
+.panel-io .iconbtn { width: 34px; height: 34px; }
+.panel-io .ico { width: 17px; height: 17px; }
+.panel-io .btn-duo { height: 34px; }
+.panel-io .btn-duo .bd-label { font-size: 12px; }
+
+/* ---------- таблицы ---------- */
+
+.gwrap { position: relative; min-width: 0; margin-top: 10px; }
+.gtable {
+  width: 100%; border-collapse: collapse; table-layout: fixed;
+  font-variant-numeric: tabular-nums;
+}
+.gtable col.c-month { width: 26%; }
+.gtable col.c-name { width: 42%; }
+.gtable th {
+  padding: 0 0 9px; text-align: right; vertical-align: bottom;
+  font-size: 11px; font-weight: 500; line-height: 1.3; color: var(--muted);
+}
+.gtable th:first-child { text-align: left; }
+.gtable .grp th { padding: 0 0 4px; text-align: center; font-size: 11px; font-weight: 600; color: var(--muted); }
+.gtable .grp th:first-child { text-align: left; }
+.gtable .sub th { border-bottom: 1px solid var(--line-strong); }
+.gtable td {
+  padding: 12px 0; text-align: right; vertical-align: baseline;
+  font-size: 13.5px; font-weight: 500; color: var(--ink);
+  border-bottom: 1px solid var(--line);
+}
+.gtable td:first-child { text-align: left; }
+.gtable tbody tr:last-child td { border-bottom: 0; }
+.gtable tbody:last-child tr:last-child td { border-bottom: 1px solid var(--line); }
+.gtable tfoot td { padding: 12px 0 0; border-top: 1px solid var(--line-strong); font-weight: 600; }
+.gtable .mhead { color: var(--accent); font-size: 11.5px; font-weight: 600; }
+.gtable .gap, .gtable .c-gap { background: transparent !important; }
+.gtable .gap { padding: 0 !important; border: 0 !important; }
+.gtable col.c-gap { width: 56px; }
+.gtable col.c-n { width: 86px; }
+.gtable.v3 .c-n { width: 86px; }
+.gtable.v3 .sub th { text-align: center; }
+.gtable.v3 .sub th:first-child { text-align: left; }
+.gtable.v3 td.num { text-align: center; }
+.gtable.v3 .grp .pair { position: relative; padding-bottom: 10px; }
+.gtable.v3 .grp .pair::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 3px;
+  height: 2px; border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 65%, var(--line-strong));
+}
+.gtable.money-year col.c-month { width: 28%; }
+.gtable.money-year col.c-nm { width: 110px; }
+.gtable.money .c-name { width: 42%; }
+
+/* ---------- телефон ---------- */
+
+@media (max-width: 759px) {
+  .jt-row { padding: 9px 10px; }
+  .jt-period { gap: 8px; }
+  .year-btn { height: 32px; font-size: 12px; }
+  .journal-top .jt-modes { flex: 0 1 auto; min-width: 0; width: auto; overflow-x: auto; scrollbar-width: none; }
+  .jt-modes::-webkit-scrollbar { display: none; }
+  .jt-modes .seg-link { flex: 0 0 auto; padding: 8px 9px; font-size: 11.5px; }
+  .jt-ribbon { flex: 1 1 100%; order: 3; }
+  .jt-month { font-size: 11.5px; padding: 8px 3px; }
+  .jt-data .dup-btn { flex: 0 0 auto; }
+  .ph-main { font-size: 14px; }
+  .ph-sub { font-size: 11.5px; }
+  .panel-io .iconbtn { width: 34px; height: 34px; }
+  .panel-io .btn-duo { height: 34px; }
+  .panel-io .btn-duo .bd-label { display: none; }
+  .panel-io .btn-duo .bd-part { padding: 0 9px; }
+  .gwrap { margin-top: 8px; }
+  .gtable .c-gap { width: 32px; }
+  .gtable.v3 .c-n { width: 76px; }
+  .gtable th { font-size: 10.5px; padding-bottom: 7px; }
+  .gtable td { font-size: 12.5px; padding: 10px 0; }
+  .gtable tfoot td { padding-top: 10px; }
+  .gtable .mhead { font-size: 11px; }
+  .gwrap.scroll { overflow-x: auto; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .gwrap.scroll::-webkit-scrollbar { display: none; }
+  .gwrap.scroll::after {
+    content: ""; position: absolute; right: 0; top: 0; bottom: 0; width: 20px;
+    background: linear-gradient(90deg, transparent, var(--surface));
+    pointer-events: none;
+  }
+  .gtable.wide { min-width: 560px; }
+  .gtable.v3.wide { min-width: 680px; }
+  .gtable.money-year.wide { min-width: 560px; }
+  .gwrap.scroll .gtable th:first-child,
+  .gwrap.scroll .gtable td:first-child {
+    position: sticky; left: 0; z-index: 1; background: var(--surface);
+  }
+}
+.journal-top .jt-modes .seg-link,
+.journal-top .jt-data .seg-link { flex: 0 0 auto; }
+/* Начисления за месяц: спокойная сетка в стиле «Итогов» */
+.money-panel .money-scroll { margin-top: 10px; scrollbar-width: none; }
+.money-panel .money-scroll::-webkit-scrollbar { display: none; }
+.money-panel table.money-table th {
+  padding: 0 0 9px; text-transform: none; letter-spacing: 0;
+  font-size: 11px; font-weight: 500; color: var(--muted);
+  border-bottom: 1px solid var(--line-strong);
+}
+.money-panel table.money-table td { padding: 11px 0; border-bottom: 1px solid var(--line); }
+.money-panel table.money-table tbody tr:last-child td { border-bottom: 0; }
+.money-panel .money-table .c-month { display: none; }
+.money-panel .money-table .c-res { width: 40%; }
+.money-panel .money-table .c-adv,
+.money-panel .money-table .c-inv { width: 20%; }
+.money-panel .money-table .c-total { width: 20%; }
+.money-panel .money-table td.res { font-size: 13.5px; font-weight: 500; color: var(--ink); }
+.money-panel .money-table td.res .r-full { display: inline; }
+.money-panel .money-table td.res .r-short { display: none; }
+.money-panel .money-table tr.is-current td.month { box-shadow: none; }
+.money-panel .money-cell { max-width: 130px; }
+.money-panel .money-cell .num {
+  height: 26px; border-color: transparent; background: transparent;
+  font-size: 13.5px; font-weight: 500;
+}
+.money-panel .money-cell .num:hover,
+.money-panel .money-cell .num:focus { border-color: var(--line-strong); background: var(--surface); }
+.money-panel .total-cell { font-size: 13.5px; font-weight: 600; }
+.money-panel .money-table tbody tr.money-line-row.is-first { border-top: 0; }
+/* Начисления: короткие названия ресурсов, как в «Итогах» */
+.money-panel .money-table td.res .r-full { display: none; }
+.money-panel .money-table td.res .r-short { display: inline; }
+
+@media (max-width: 759px) {
+  .journal-panel .section-head {
+    display: flex; flex-wrap: nowrap; align-items: flex-start; gap: 8px;
+  }
+  .journal-panel .section-head .ph { flex: 1 1 auto; min-width: 0; }
+  .journal-panel .section-head-side { flex: 0 0 auto; width: auto; justify-content: flex-end; }
+  .money-panel .money-table tr.money-month-row { display: none; }
+  .jt-period { gap: 6px; }
+  .year-btn { height: 32px; padding: 0 8px 0 10px; font-size: 11.5px; }
+  .jt-modes .seg-link { padding: 7px 6px; font-size: 10.5px; }
+}
+@media (max-width: 759px) {
+  .gtable.v3.wide { min-width: 760px; }
+  .gtable.v3 col.c-month { width: 150px; }
+  .gtable.v3 th:first-child, .gtable.v3 td:first-child { white-space: nowrap; }
+  .gtable.money-year col.c-month { width: 150px; }
+}
+@media (max-width: 759px) {
+  .journal-top .jt-modes .seg-link { padding: 6px 4px; font-size: 10px; }
+  .journal-top .jt-data .seg-link { padding: 8px 10px; font-size: 12px; }
 }
