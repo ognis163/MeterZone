@@ -257,7 +257,8 @@ func TestChargesCSVExport(t *testing.T) {
 	}
 }
 
-// Диапазон заменяет ленту месяцев полями «с — по», а выбор года её сохраняет.
+// Диапазон заменяет ленту месяцев полями «с — по» в той же строке периода,
+// а выбор года её сохраняет.
 func TestJournalRangeReplacesRibbon(t *testing.T) {
 	_, _, h := newTestServer(t)
 	rr := request(t, h, http.MethodGet,
@@ -269,11 +270,42 @@ func TestJournalRangeReplacesRibbon(t *testing.T) {
 	if strings.Contains(body, `class="jt-ribbon"`) {
 		t.Fatal("в режиме диапазона лента месяцев не должна показываться")
 	}
-	if !strings.Contains(body, "jrange-custom") {
+	if !strings.Contains(body, `class="jt-range"`) {
 		t.Fatal("в режиме диапазона нет полей «с — по»")
 	}
 	if !strings.Contains(body, "Показать") {
 		t.Fatal("в режиме диапазона нет кнопки «Показать»")
+	}
+	// Поля диапазона стоят там же, где лента: между строкой периода и
+	// строкой фильтра, а не отдельной строкой под ней.
+	periodAt := strings.Index(body, `class="jt-row jt-period"`)
+	rangeAt := strings.Index(body, `class="jt-range"`)
+	dataAt := strings.Index(body, `class="jt-row jt-data"`)
+	if periodAt < 0 || rangeAt < periodAt || dataAt < rangeAt {
+		t.Fatal("поля диапазона должны быть в строке периода, а не отдельной строкой")
+	}
+}
+
+// В режиме месяца лента остаётся, а рядом живёт телефонный выбор месяца.
+func TestJournalMonthKeepsRibbonAndPick(t *testing.T) {
+	_, _, h := newTestServer(t)
+	rr := request(t, h, http.MethodGet,
+		"/journal?object=1&from=2026-03&to=2026-03", nil, "")
+	if rr.Code != http.StatusOK {
+		t.Fatalf("код %d", rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, `class="jt-ribbon"`) {
+		t.Fatal("в режиме месяца лента месяцев должна оставаться")
+	}
+	if !strings.Contains(body, `data-mpick`) {
+		t.Fatal("нет телефонного выбора месяца")
+	}
+	if strings.Contains(body, `class="jt-range"`) {
+		t.Fatal("в режиме месяца полей диапазона быть не должно")
+	}
+	if !strings.Contains(body, `class="mpick-item is-on"`) {
+		t.Fatal("в списке месяцев не отмечен выбранный")
 	}
 }
 

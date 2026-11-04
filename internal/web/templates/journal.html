@@ -31,7 +31,19 @@
       <a class="seg-link{{if or .ModeRange .RangeOpen}} is-active{{end}}" href="{{.RangeHref}}">Диапазон</a>
     </div>
 
-    {{if not .RangeOpen}}
+    {{if .RangeOpen}}
+    <form method="get" action="/journal" class="jt-range">
+      <input type="hidden" name="object" value="{{.Object.ID}}">
+      {{if ne .Scope "all"}}<input type="hidden" name="scope" value="{{.Scope}}">{{end}}
+      {{if .DupOn}}<input type="hidden" name="dup" value="1">{{end}}
+      <span class="jt-range-fields">
+        <input type="month" name="from" value="{{.FromValue}}" min="2000-01" max="2100-12" aria-label="С месяца">
+        <span class="jt-range-dash">—</span>
+        <input type="month" name="to" value="{{.ToValue}}" min="2000-01" max="2100-12" aria-label="По месяц">
+      </span>
+      <button class="btn btn-ghost btn-sm" type="submit">Показать</button>
+    </form>
+    {{else}}
     <div class="jt-ribbon">
       <a class="jt-nav" href="{{.PrevRibbon}}" aria-label="Предыдущий месяц">{{template "icon-left"}}</a>
       <div class="jt-months">
@@ -43,17 +55,7 @@
     </div>
     {{end}}
 
-    <form method="get" action="/journal" class="jrange-custom">
-      <input type="hidden" name="object" value="{{.Object.ID}}">
-      {{if ne .Scope "all"}}<input type="hidden" name="scope" value="{{.Scope}}">{{end}}
-      {{if .DupOn}}<input type="hidden" name="dup" value="1">{{end}}
-      <span class="jrange-range">
-        <input type="month" name="from" value="{{.FromValue}}" min="2000-01" max="2100-12" aria-label="С месяца">
-        <span class="jrange-dash">—</span>
-        <input type="month" name="to" value="{{.ToValue}}" min="2000-01" max="2100-12" aria-label="По месяц">
-      </span>
-      <button class="btn btn-ghost btn-sm" type="submit">Показать</button>
-    </form>
+    {{template "monthpick" .Pick}}
   </div>
 
   <div class="jt-row jt-data">

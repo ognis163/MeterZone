@@ -84,6 +84,32 @@
 <svg class="ico ico-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
 {{end}}
 
+{{define "icon-calendar"}}
+<svg class="ico ico-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.6"/><path d="M3.5 9.5h17M8 3.5V6M16 3.5V6"/></svg>
+{{end}}
+
+{{/* ---------- выбор месяца на телефоне: одно поле со списком ---------- */}}
+{{define "monthpick"}}
+<div class="mpick" data-mpick>
+  <button class="mpick-btn" type="button" data-mpick-toggle aria-expanded="false" aria-haspopup="listbox">
+    {{template "icon-calendar"}}
+    <span class="mpick-label">{{.Label}}</span>
+    <svg class="mpick-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="m3 4.5 3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <div class="mpick-pop" data-mpick-pop hidden>
+    <span class="mpick-band" aria-hidden="true"></span>
+    <div class="mpick-list" data-mpick-list role="listbox" aria-label="Месяц">
+      {{range .Months}}
+      <a class="mpick-item{{if .Current}} is-on{{end}}" href="{{.Href}}"{{if .Current}} aria-current="date"{{end}}>
+        <span class="mpick-m">{{.Label}}</span>
+        <span class="mpick-y">{{.Year}}</span>
+      </a>
+      {{end}}
+    </div>
+  </div>
+</div>
+{{end}}
+
 {{define "objectseg"}}
 <div class="segmented object-seg" role="group" aria-label="Объект">
   {{range .Objects}}

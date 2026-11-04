@@ -868,6 +868,8 @@ type journalPageData struct {
 	ModeTwo     bool
 	ModeRange   bool
 	SingleMonth bool
+	// Pick — выбор месяца одним полем на телефоне.
+	Pick periodPick
 
 	// Новые таблицы «Итоги» и «Начисления».
 	MonthRows  []journalResRow
@@ -1075,6 +1077,21 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 		data.PrevRibbon, data.NextRibbon, data.ModeMonth, data.ModeYear, data.ModeTwo =
 		buildJournalNav(obj.ID, scope, from, to, year, today, dupOn, monthsWithData)
 	data.ModeRange = !data.ModeMonth && !data.ModeYear && !data.ModeTwo
+	// Подпись телефонного выбора месяца: месяц, год, два года или диапазон.
+	pickLabel := from.Label() + " — " + to.Label()
+	pickCurrent := model.Period{}
+	switch {
+	case data.ModeMonth:
+		pickLabel = from.Label()
+		pickCurrent = from
+	case data.ModeYear:
+		pickLabel = strconv.Itoa(from.Year) + " год"
+	case data.ModeTwo:
+		pickLabel = strconv.Itoa(from.Year) + " — " + strconv.Itoa(to.Year)
+	}
+	data.Pick = buildPeriodPick(from, pickCurrent, pickLabel, func(p model.Period) string {
+		return journalHref(obj.ID, p, p, scope, dupOn)
+	})
 	data.SingleMonth = from == to
 	data.MonthRows = buildMonthRows(rows)
 	data.YearTable = buildJournalYear(rows, resources, data.Totals, dupOn)

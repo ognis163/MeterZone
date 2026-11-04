@@ -986,6 +986,41 @@
       if (e.key === "Escape") jyOpen(false);
     });
   }
+  // --- выбор месяца на телефоне: поле со списком -------------------------
+  // Список прокручивается, выбранный месяц стоит посередине, края списка
+  // плавно растворяются (это делает CSS-маска).
+  var mPick = q("[data-mpick]");
+  var mPickBtn = q("[data-mpick-toggle]", mPick);
+  var mPickPop = q("[data-mpick-pop]", mPick);
+  var mPickList = q("[data-mpick-list]", mPick);
+  if (mPickBtn && mPickPop && mPickList) {
+    var mpCenter = function () {
+      var cur = q(".mpick-item.is-on", mPickList) || mPickList.children[24];
+      if (!cur) return;
+      mPickList.style.scrollBehavior = "auto";
+      mPickList.scrollTop = cur.offsetTop - (mPickList.clientHeight - cur.offsetHeight) / 2;
+      mPickList.style.scrollBehavior = "";
+    };
+    var mpOpen = function (show) {
+      mPickPop.hidden = !show;
+      mPickBtn.setAttribute("aria-expanded", show ? "true" : "false");
+      if (show) window.requestAnimationFrame(mpCenter);
+    };
+    mPickBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      mpOpen(mPickPop.hidden);
+    });
+    document.addEventListener("click", function (e) {
+      if (!mPickPop.hidden && !mPick.contains(e.target)) mpOpen(false);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") mpOpen(false);
+    });
+    window.addEventListener("resize", function () {
+      if (!mPickPop.hidden) mpCenter();
+    });
+  }
+
 
   // --- автоподстановка расчётного из дублирующего ------------------------
   var subs = qa(".meter-input input[data-parent-meter]");

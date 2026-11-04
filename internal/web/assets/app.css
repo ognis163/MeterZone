@@ -3037,24 +3037,6 @@ td.total-cell { white-space: nowrap; }
 .jt-data { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .journal-top .jt-data .segmented { flex: 0 0 auto; width: auto; }
 
-.journal-top .jrange-custom { display: none; }
-.journal-top.range-open .jrange-custom { display: flex; align-items: center; gap: 8px; flex: 1 1 100%; }
-
-/* Телефон: поля «с — по» в журнале занимают всю строку, кнопка — ниже. */
-@media (max-width: 759px) {
-  .journal-top.range-open .jrange-custom {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    gap: 6px; width: 100%; margin-top: 2px;
-  }
-  .journal-top.range-open .jrange-custom .jrange-range { display: contents; }
-  .journal-top.range-open .jrange-custom > .btn {
-    grid-column: 1 / -1;
-    justify-content: center;
-    width: 100%; min-height: 40px;
-  }
-}
-
 /* ---------- заголовки панелей в две строки + действия ---------- */
 
 .section-head .ph { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
@@ -3216,4 +3198,189 @@ td.total-cell { white-space: nowrap; }
 @media (max-width: 759px) {
   .journal-top .jt-modes .seg-link { padding: 6px 4px; font-size: 10px; }
   .journal-top .jt-data .seg-link { padding: 8px 10px; font-size: 12px; }
+}
+
+/* ======================================================================
+   1.5.6 · журнал и показания
+   ----------------------------------------------------------------------
+   1) диапазон встаёт на место ленты месяцев — в ту же строку;
+   2) CSV/PDF — обычное начертание;
+   3) стрелки ленты и выбранный месяц — фирменный зелёный;
+   4) «Дубль» — сразу за фильтром ресурса;
+   5) телефон: год и месяц — одно поле со списком месяцев, кнопки периода
+      на всю ширину блока, размеры — под палец.
+   ====================================================================== */
+
+/* ---------- 1. Диапазон вместо ленты, та же строка ---------- */
+
+.top-panel .jt-range {
+  display: flex; align-items: center; gap: 8px;
+  flex: 1 1 360px; min-width: 0;
+}
+.jt-range-fields { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.top-panel .jt-range input[type="month"] {
+  width: 158px; min-width: 0; height: 34px; min-height: 34px;
+  padding: 0 8px; font-size: 12.5px; font-variant-numeric: tabular-nums;
+  border: 1px solid var(--line-strong); border-radius: 10px;
+  background: var(--surface); color: var(--ink);
+}
+.top-panel .jt-range input[type="month"]:hover { border-color: var(--ink-2); }
+.top-panel .jt-range input[type="month"]:focus { border-color: var(--accent); outline: none; }
+.jt-range-dash { color: var(--faint); font-size: 13px; }
+.top-panel .jt-range .btn { min-height: 34px; padding: 0 13px; font-size: 12.5px; border-radius: 10px; }
+
+/* ---------- 2. CSV и PDF — обычным начертанием ---------- */
+
+.panel-io .btn-doc { font-weight: 500; letter-spacing: .015em; }
+
+/* ---------- 3. Лента месяцев: зелёные стрелки и выбранный месяц ---------- */
+
+.jt-nav { color: var(--accent); }
+.jt-nav:hover { background: var(--accent-soft); color: var(--accent); }
+.jt-month.is-active,
+.jt-month.is-active:hover {
+  background: var(--accent-soft); color: var(--accent); font-weight: 650;
+}
+
+/* ---------- 4. «Дубль» рядом с фильтром ресурса ---------- */
+
+.jt-data { justify-content: flex-start; gap: 10px; }
+
+/* ---------- 5. Выбор месяца списком (телефон) ---------- */
+
+.mpick { display: none; }
+
+@media (max-width: 759px) {
+  /* --- верхняя панель: одно крупное поле вместо года и ленты --- */
+  .top-panel .jt-row { padding: 10px 12px; }
+  .jt-period { gap: 8px; }
+  .jt-period > .year-pick,
+  .jt-period > .jt-ribbon { display: none; }
+
+  .mpick { display: block; position: relative; order: 1; flex: 1 1 100%; min-width: 0; }
+  .mpick-btn {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    height: 48px; padding: 0 13px;
+    border: 1px solid var(--line-strong); border-radius: 12px;
+    background: var(--surface); color: var(--ink);
+    font: inherit; font-size: 15.5px; font-weight: 600; letter-spacing: -.012em;
+    text-align: left;
+  }
+  .mpick-btn:active { background: var(--surface-2); }
+  .mpick-btn[aria-expanded="true"] { border-color: var(--accent); }
+  .mpick-btn .ico { width: 19px; height: 19px; flex: none; color: var(--accent); }
+  .mpick-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mpick-caret { width: 15px; height: 15px; color: var(--muted); flex: none; transition: transform .16s ease; }
+  .mpick-btn[aria-expanded="true"] .mpick-caret { transform: rotate(180deg); }
+
+  .mpick-pop {
+    position: absolute; z-index: 60; left: 0; right: 0; top: calc(100% + 6px);
+    padding: 6px; background: var(--surface);
+    border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow-2);
+  }
+  .mpick-band {
+    position: absolute; left: 8px; right: 8px; top: 50%; height: 50px;
+    transform: translateY(-50%); border-radius: 12px;
+    background: var(--surface-2); pointer-events: none;
+  }
+  .mpick-list {
+    position: relative; height: 270px; overflow-y: auto;
+    scroll-snap-type: y mandatory; overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 21%, #000 79%, transparent 100%);
+    mask-image: linear-gradient(180deg, transparent 0, #000 21%, #000 79%, transparent 100%);
+  }
+  .mpick-list::-webkit-scrollbar { display: none; }
+  .mpick-list::before,
+  .mpick-list::after { content: ""; display: block; height: 110px; }
+  .mpick-item {
+    display: flex; align-items: center; gap: 10px;
+    height: 50px; padding: 0 16px; border-radius: 12px;
+    scroll-snap-align: center;
+    font-size: 16.5px; letter-spacing: -.012em; color: var(--ink-2);
+  }
+  .mpick-item .mpick-m { flex: 1 1 auto; min-width: 0; }
+  .mpick-y { font-size: 13.5px; color: var(--faint); font-variant-numeric: tabular-nums; }
+  .mpick-item.is-on { color: var(--accent); font-weight: 650; }
+  .mpick-item.is-on .mpick-y { color: var(--accent); }
+
+  /* --- режимы периода на всю ширину блока --- */
+  .top-panel .jt-modes {
+    order: 2; flex: 1 1 100%; width: 100%; overflow: visible;
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .top-panel .jt-modes .seg-link {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 44px; padding: 0 4px; font-size: 13px;
+  }
+
+  /* --- поля диапазона — там, где была лента --- */
+  .top-panel .jt-range { order: 3; flex: 1 1 100%; display: block; width: 100%; }
+  .jt-range-fields {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 6px; align-items: center;
+  }
+  .top-panel .jt-range input[type="month"] { width: 100%; height: 46px; font-size: 14px; padding: 0 10px; }
+  .jt-range-dash { font-size: 15px; }
+  .top-panel .jt-range .btn { width: 100%; min-height: 46px; margin-top: 6px; font-size: 15px; }
+
+  /* --- фильтр ресурса и «Дубль» --- */
+  .jt-data { gap: 8px; }
+  .top-panel .jt-data .seg-link {
+    display: inline-flex; align-items: center;
+    min-height: 44px; padding: 0 14px; font-size: 14px;
+  }
+  .dup-btn { min-height: 44px; padding: 0 14px; font-size: 13.5px; gap: 6px; }
+  .dup-btn .ico { width: 15px; height: 15px; }
+
+  /* --- панели «Итоги» и «Начисления» --- */
+  .ph-main { font-size: 17px; }
+  .ph-sub { font-size: 13px; }
+  .panel-io .btn-doc { min-width: 56px; height: 38px; padding: 0 11px; font-size: 12.5px; }
+  .panel-io .btn-duo { height: 38px; }
+  .panel-io .btn-duo .bd-part { padding: 0 12px; }
+  .panel-io .btn-duo .bd-part .ico { width: 18px; height: 18px; }
+
+  /* --- таблицы журнала --- */
+  .gtable th { font-size: 12px; padding-bottom: 9px; }
+  .gtable .grp th { font-size: 12px; }
+  .gtable .mhead { font-size: 12.5px; }
+  .gtable td { font-size: 14.5px; padding: 13px 0; }
+  .gtable tfoot td { padding-top: 12px; }
+  .hint { font-size: 13.5px; line-height: 1.5; margin-top: 10px; }
+
+  /* --- страница показаний --- */
+  .res-strip b { font-size: 17px; }
+  .res-strip .ico-res { width: 19px; height: 19px; }
+  .res-group-title { font-size: 11px; }
+  .meter { padding: 16px 0; }
+  .meter-name { font-size: 16px; }
+  .meter-name small { font-size: 12.5px; }
+  .meter-prev .lbl,
+  .meter-diff .lbl { font-size: 10.5px; }
+  .meter-prev .val { font-size: 16px; }
+  .meter-diff .val { font-size: 17px; }
+  .meter-input input { height: 54px; font-size: 19px; }
+  .meter-input .unit { font-size: 12px; }
+  .dup-note { font-size: 12.5px; }
+  .badge-sub { font-size: 11px; padding: 3px 8px; }
+
+  /* --- начисления: заголовок, подписи, поля --- */
+  .finance-panel { padding: 16px; }
+  .finance-panel .section-head { margin-bottom: 12px; }
+  .finance-panel .section-head h2 { font-size: 17px; }
+  .fin-row { padding: 14px 0; gap: 8px; }
+  .fin-label { font-size: 14.5px; }
+  .finance-panel .st { font-size: 12px; }
+  .fin-cap { font-size: 10.5px; }
+  .finance-panel .fin-input .num { height: 48px; min-height: 48px; font-size: 17px; padding-right: 58px; }
+  .st-check { width: 44px; height: 44px; top: 2px; right: 2px; font-size: 16px; }
+
+  /* --- прочее на странице --- */
+  .danger summary { font-size: 14px; }
+
+  /* --- нижнее меню --- */
+  .tabbar a { font-size: 11px; }
 }
