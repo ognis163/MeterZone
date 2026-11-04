@@ -313,6 +313,10 @@ func periodRangeText(from, to string) string {
 // период — тогда в файл попадают только выбранные месяцы; без параметров
 // выгружается всё (ссылка из настроек).
 func (s *Server) handleExportCSV(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("kind") == "charges" {
+		s.handleExportChargesCSV(w, r)
+		return
+	}
 	var objectID int64
 	if v := strings.TrimSpace(r.URL.Query().Get("object")); v != "" {
 		if id, err := strconv.ParseInt(v, 10, 64); err == nil && id > 0 {
@@ -361,6 +365,56 @@ func (s *Server) handleExportCSV(w http.ResponseWriter, r *http.Request) {
 			model.Resource(e.Resource).Label(), e.Period,
 			model.FormatValue(e.Value), cons,
 		})
+	}
+	cw.Flush()
+}
+
+// handleExportChargesCSV выгружает начисления за период: по строке на каждый
+// месяц и лицевой счёт. Колонки те же, что в ведомости начислений.
+func (s *Server) handleExportChargesCSV(w http.ResponseWriter, r *http.Request) {
+	obj, err := s.docObject(r)
+	if err != nil {
+		s.fail(w, http.StatusNotFound, "Объект не найден", "Не удалось выбрать объект для выгрузки.")
+		return
+	}
+	now := time.Now().In(s.Loc)
+	from := periodValue(r, "from", model.Period{Year: now.Year(), Month: 1})
+	to := periodValue(r, "to", model.Period{Year: now.Year(), Month: 12})
+	if to.Before(from) {
+		from, to = to, from
+	}
+	if from.MonthDiff(to) > 120 {
+		s.fail(w, http.StatusBadRequest, "Слишком большой период", "Период больше 10 лет.")
+		return
+	}
+	scope := scopeValue(r)
+	grid, err := s.Store.MoneyGridIn(obj.ID, from, to)
+	if err != nil {
+		s.fail(w, http.StatusInternalServerError, "Ошибка", "Не удалось выгрузить начисления.")
+		return
+	}
+
+	name := "Начисления — " + objectPlace(obj) + " — " +
+		periodRangeText(from.String(), to.String()) + ".csv"
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", "attachment; filename=\"meterzone-charges.csv\"; filename*=UTF-8'"+url.PathEscape(sanitizeFileName(name)))
+	w.Write([]byte{0xEF, 0xBB, 0xBF})
+	cw := csv.NewWriter(w)
+	cw.Comma = ';'
+	cw.Write([]string{"Объект", "Адрес", "Собственник", "Период", "Лицевой счёт",
+		"Аванс", "Счёт", "Итого", "Оплачено", "К оплате"})
+	for p := from; !p.After(to); p = p.Next() {
+		for _, acc := range scopeAccounts(scope) {
+			rec := grid[p.String()][acc]
+			cw.Write([]string{
+				obj.Title(), obj.Address, obj.Owner, p.Label(), acc.Short(),
+				model.FormatValue(model.Round2(rec.AdvanceSum)),
+				model.FormatValue(model.Round2(rec.InvoiceSum)),
+				model.FormatValue(model.Round2(rec.Total())),
+				model.FormatValue(model.Round2(rec.Paid())),
+				model.FormatValue(model.Round2(rec.Due())),
+			})
+		}
 	}
 	cw.Flush()
 }

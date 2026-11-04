@@ -5,9 +5,33 @@
 <form method="post" action="/o/{{.Object.ID}}/readings?m={{.Period}}" class="entry-form" data-entry
       data-object="{{.Object.ID}}" data-period="{{.Period}}">
 
-  <section class="top-panel">
-    {{template "objectseg" .}}
-    {{template "monthnav" .MonthNav}}
+  <section class="top-panel home-top">
+    <div class="jt-row jt-obj">
+      {{template "objectseg" .}}
+    </div>
+    <div class="jt-row jt-period">
+      <div class="year-pick">
+        <button class="year-btn" type="button" data-jyear-toggle aria-expanded="false" aria-haspopup="listbox">
+          <span>{{.PeriodNav.Year}}</span>
+          <svg class="year-caret" viewBox="0 0 12 12" aria-hidden="true"><path d="m3 4.5 3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="year-pop" data-jyear-pop hidden role="listbox">
+          {{range .PeriodNav.Years}}
+          <a class="year-item{{if .Current}} is-on{{end}}" href="{{.Href}}"{{if .Current}} aria-current="true"{{end}}>{{.Year}}</a>
+          {{end}}
+        </div>
+      </div>
+
+      <div class="jt-ribbon">
+        <a class="jt-nav" href="{{.PeriodNav.PrevRibbon}}" aria-label="Предыдущий месяц">{{template "icon-left"}}</a>
+        <div class="jt-months">
+          {{range .PeriodNav.Ribbon}}
+          <a class="jt-month{{if .Current}} is-active{{end}}" href="{{.Href}}"{{if .Current}} aria-current="date"{{end}}>{{.Label}}</a>
+          {{end}}
+        </div>
+        <a class="jt-nav" href="{{.PeriodNav.NextRibbon}}" aria-label="Следующий месяц">{{template "icon-right"}}</a>
+      </div>
+    </div>
   </section>
 
   <div class="entry-main" data-entry-main>

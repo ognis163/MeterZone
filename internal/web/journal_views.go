@@ -46,6 +46,10 @@ func buildJournalNav(objID int64, scope string, from, to model.Period, year int,
 	yearHref = journalHref(objID, model.Period{Year: year, Month: 1}, model.Period{Year: year, Month: 12}, scope, dupOn)
 	twoHref = journalHref(objID, model.Period{Year: year - 1, Month: 1}, model.Period{Year: year, Month: 12}, scope, dupOn)
 
+	modeMonth = from == to
+	modeYear = from.Year == to.Year && from.Month == 1 && to.Month == 12
+	modeTwo = from.Year == to.Year-1 && from.Month == 1 && to.Month == 12
+
 	sel := model.Period{Year: year, Month: 1}
 	switch {
 	case from == to && from.Year == year:
@@ -65,20 +69,16 @@ func buildJournalNav(objID int64, scope string, from, to model.Period, year int,
 	for i := 0; i < 5; i++ {
 		p := model.Period{Year: year, Month: start + i}
 		ribbon = append(ribbon, ribbonMonthView{
-			Label:   p.MonthShort(),
-			Href:    journalHref(objID, p, p, scope, dupOn),
-			Current: p == sel,
+			Label: p.MonthShort(),
+			Href:  journalHref(objID, p, p, scope, dupOn),
+			// В режиме года лента не исчезает, но месяц не подсвечиваем:
+			// выбран весь год, а не отдельный месяц.
+			Current: p == sel && modeMonth,
 			Has:     monthsWithData[p.String()],
 		})
 	}
-	prev := sel
-	if prev.Month > 1 {
-		prev.Month--
-	}
-	next := sel
-	if next.Month < 12 {
-		next.Month++
-	}
+	prev := sel.Prev()
+	next := sel.Next()
 	prevRibbon = journalHref(objID, prev, prev, scope, dupOn)
 	nextRibbon = journalHref(objID, next, next, scope, dupOn)
 
@@ -90,9 +90,6 @@ func buildJournalNav(objID int64, scope string, from, to model.Period, year int,
 		})
 	}
 
-	modeMonth = from == to
-	modeYear = from.Year == to.Year && from.Month == 1 && to.Month == 12
-	modeTwo = from.Year == to.Year-1 && from.Month == 1 && to.Month == 12
 	return
 }
 

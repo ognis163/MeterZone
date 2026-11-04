@@ -25,13 +25,13 @@
     </div>
 
     <div class="segmented jt-modes">
-      <a class="seg-link{{if .ModeMonth}} is-active{{end}}" href="{{.MonthHref}}">Месяц</a>
-      <a class="seg-link{{if .ModeYear}} is-active{{end}}" href="{{.YearHref}}">Год</a>
-      <a class="seg-link{{if .ModeTwo}} is-active{{end}}" href="{{.TwoHref}}">2 года</a>
-      <a class="seg-link{{if .ModeRange}} is-active{{end}}" href="{{.RangeHref}}">Диапазон</a>
+      <a class="seg-link{{if and .ModeMonth (not .RangeOpen)}} is-active{{end}}" href="{{.MonthHref}}">Месяц</a>
+      <a class="seg-link{{if and .ModeYear (not .RangeOpen)}} is-active{{end}}" href="{{.YearHref}}">Год</a>
+      <a class="seg-link{{if and .ModeTwo (not .RangeOpen)}} is-active{{end}}" href="{{.TwoHref}}">2 года</a>
+      <a class="seg-link{{if or .ModeRange .RangeOpen}} is-active{{end}}" href="{{.RangeHref}}">Диапазон</a>
     </div>
 
-    {{if .ModeMonth}}
+    {{if not .RangeOpen}}
     <div class="jt-ribbon">
       <a class="jt-nav" href="{{.PrevRibbon}}" aria-label="Предыдущий месяц">{{template "icon-left"}}</a>
       <div class="jt-months">
@@ -97,8 +97,8 @@
     <h2 class="ph"><span class="ph-main">Итоги</span><span class="ph-sub">{{.RangeLabel}}</span></h2>
     <div class="section-head-side">
       <div class="panel-io">
-        <a class="iconbtn" href="{{.CSVHref}}" title="Скачать CSV" aria-label="Скачать CSV">{{template "icon-download"}}</a>
-        <a class="iconbtn" href="{{.DocPDFHref}}" title="Скачать PDF" aria-label="Скачать PDF">{{template "icon-report"}}</a>
+        <a class="btn-doc" href="{{.CSVHref}}" title="Скачать CSV">CSV</a>
+        <a class="btn-doc" href="{{.DocPDFHref}}" title="Скачать PDF">PDF</a>
         <a class="btn-duo" href="{{.StatementHref}}" title="Документ: печать и отправка на почту">
           <span class="bd-part">{{template "icon-print"}}<span class="bd-label">Печать</span></span>
           <span class="bd-part">{{template "icon-mail"}}<span class="bd-label">Отправить</span></span>
@@ -186,6 +186,8 @@
     <h2 class="ph"><span class="ph-main">Начисления</span><span class="ph-sub">{{.RangeLabel}}</span></h2>
     <div class="section-head-side">
       <div class="panel-io">
+        <a class="btn-doc" href="{{.MoneyCSVHref}}" title="Скачать CSV">CSV</a>
+        <a class="btn-doc" href="{{.MoneyDocPDFHref}}" title="Скачать PDF">PDF</a>
         <a class="btn-duo" href="{{.MoneyHref}}" title="Документ: печать и отправка на почту">
           <span class="bd-part">{{template "icon-print"}}<span class="bd-label">Печать</span></span>
           <span class="bd-part">{{template "icon-mail"}}<span class="bd-label">Отправить</span></span>

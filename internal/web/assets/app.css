@@ -2983,7 +2983,8 @@ td.total-cell { white-space: nowrap; }
    Журнал 1.5.4: верхний блок в три строки и таблицы в стиле «Сведений»
    ====================================================================== */
 
-.journal-top { display: block; padding: 0; gap: 0; }
+.journal-top, .home-top { display: block; padding: 0; gap: 0; }
+.home-top { margin-bottom: 16px; }
 .jt-row { padding: 10px 12px; min-width: 0; }
 .jt-row + .jt-row { border-top: 1px solid var(--line); }
 .jt-obj { padding: 8px 10px; }
@@ -3039,6 +3040,21 @@ td.total-cell { white-space: nowrap; }
 .journal-top .jrange-custom { display: none; }
 .journal-top.range-open .jrange-custom { display: flex; align-items: center; gap: 8px; flex: 1 1 100%; }
 
+/* Телефон: поля «с — по» в журнале занимают всю строку, кнопка — ниже. */
+@media (max-width: 759px) {
+  .journal-top.range-open .jrange-custom {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 6px; width: 100%; margin-top: 2px;
+  }
+  .journal-top.range-open .jrange-custom .jrange-range { display: contents; }
+  .journal-top.range-open .jrange-custom > .btn {
+    grid-column: 1 / -1;
+    justify-content: center;
+    width: 100%; min-height: 40px;
+  }
+}
+
 /* ---------- заголовки панелей в две строки + действия ---------- */
 
 .section-head .ph { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
@@ -3049,6 +3065,15 @@ td.total-cell { white-space: nowrap; }
 .panel-io .ico { width: 17px; height: 17px; }
 .panel-io .btn-duo { height: 34px; }
 .panel-io .btn-duo .bd-label { font-size: 12px; }
+.panel-io .btn-doc {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 34px; min-width: 52px; padding: 0 13px;
+  border: 1px solid var(--line-strong); border-radius: 10px;
+  background: var(--surface); color: var(--ink-2);
+  font-family: inherit; font-size: 11.5px; font-weight: 650; letter-spacing: .04em;
+  text-decoration: none; white-space: nowrap;
+}
+.panel-io .btn-doc:hover { border-color: var(--accent); color: var(--accent); }
 
 /* ---------- таблицы ---------- */
 
@@ -3113,6 +3138,8 @@ td.total-cell { white-space: nowrap; }
   .panel-io .btn-duo { height: 34px; }
   .panel-io .btn-duo .bd-label { display: none; }
   .panel-io .btn-duo .bd-part { padding: 0 9px; }
+  .panel-io { gap: 4px; }
+  .panel-io .btn-doc { min-width: 42px; padding: 0 9px; font-size: 10.5px; letter-spacing: .03em; }
   .gwrap { margin-top: 8px; }
   .gtable .c-gap { width: 32px; }
   .gtable.v3 .c-n { width: 76px; }

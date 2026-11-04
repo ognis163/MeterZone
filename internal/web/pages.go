@@ -212,7 +212,6 @@ type indexPageData struct {
 	Empty     bool
 	IsCurrent bool
 	Summary   indexSummary
-	MonthNav  monthNavView
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -300,7 +299,7 @@ type entryPageData struct {
 	EnergyTotal float64
 	DebtTotal   float64
 	HasDebt     bool
-	MonthNav    monthNavView
+	PeriodNav   periodRibbonNav
 
 	EmailWater  string
 	EmailEnergy string
@@ -534,10 +533,10 @@ func (s *Server) buildEntryData(r *http.Request, obj model.Object, period model.
 	for _, row := range money {
 		monthRows = append(monthRows, financeRowFrom(row))
 	}
-	avail, _ := s.Store.AvailableMonths(obj.ID)
-	nav := buildMonthNav(period, monthsMap(avail), func(p model.Period) string {
+	today := model.PeriodOf(time.Now().In(s.Loc))
+	nav := buildPeriodRibbon(period, today, func(p model.Period) string {
 		return fmt.Sprintf("/?object=%d&m=%s", obj.ID, p.String())
-	}, model.PeriodOf(time.Now().In(s.Loc)))
+	})
 
 	base := s.base(obj.Title(), "home")
 	base.Error = errMsg
@@ -554,7 +553,7 @@ func (s *Server) buildEntryData(r *http.Request, obj model.Object, period model.
 		Filled:            filled,
 		Total:             total,
 		HasMeters:         total > 0,
-		IsFuture:          period.After(model.PeriodOf(time.Now().In(s.Loc))),
+		IsFuture:          period.After(today),
 		WaterTotal:        water,
 		EnergyTotal:       energy,
 		FinanceAny:        financeAny,
@@ -571,7 +570,7 @@ func (s *Server) buildEntryData(r *http.Request, obj model.Object, period model.
 		MonthLabel:        period.Accusative() + " г.",
 		DebtTotal:         model.Round2(debt),
 		HasDebt:           debt != 0,
-		MonthNav:          nav,
+		PeriodNav:         nav,
 		EmailWater:        obj.EmailWater,
 		EmailEnergy:       obj.EmailEnergy,
 		EmailTo:           reportEmail(obj, "water"),
@@ -818,7 +817,6 @@ type journalPageData struct {
 	MoneyEnabled   bool
 	MoneyFromLabel string
 	MoneyToLabel   string
-	MonthNav       monthNavView
 	SelectedMonth  string
 	From           model.Period
 	To             model.Period
@@ -853,6 +851,9 @@ type journalPageData struct {
 	// Выгрузка выбранного объекта и периода из журнала.
 	CSVHref    string
 	DocPDFHref string
+	// Выгрузка начислений за тот же период.
+	MoneyCSVHref    string
+	MoneyDocPDFHref string
 
 	// Верхний блок: год, режимы периода и лента месяцев.
 	Years       []yearOptionView
@@ -1149,7 +1150,9 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 	}
 	data.DupHref = "/journal?" + dupQ.Encode()
 
-	data.RangeOpen = r.URL.Query().Get("range") == "1"
+	// Поля «с — по» показываем и после применения произвольного диапазона:
+	// иначе из режима диапазона некуда было бы вернуться к месяцам.
+	data.RangeOpen = data.ModeRange || r.URL.Query().Get("range") == "1"
 	rangeQ := url.Values{}
 	rangeQ.Set("object", strconv.FormatInt(obj.ID, 10))
 	rangeQ.Set("from", from.String())
@@ -1186,6 +1189,17 @@ func (s *Server) handleJournal(w http.ResponseWriter, r *http.Request) {
 		"from":   {from.String()},
 		"to":     {to.String()},
 	}.Encode()
+
+	// Начисления: CSV — строки по месяцам и счетам, PDF — ведомость начислений.
+	chargesQuery := url.Values{
+		"object": {strconv.FormatInt(obj.ID, 10)},
+		"kind":   {"charges"},
+		"scope":  {scope},
+		"from":   {from.String()},
+		"to":     {to.String()},
+	}
+	data.MoneyCSVHref = "/export.csv?" + chargesQuery.Encode()
+	data.MoneyDocPDFHref = "/pdf?" + chargesQuery.Encode()
 
 	// Таблица «Итоги» ссылается на лист показаний: собираем её после ссылки.
 	data.JournalTable = buildJournalTable(rows, resources, data.Totals,

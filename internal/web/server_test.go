@@ -73,6 +73,9 @@ func TestPagesRender(t *testing.T) {
 		{"/reports/preview?object=1&kind=range&from=2026-01&to=2026-12&scope=water", "Ведомость"},
 		{"/reports/preview?object=1&kind=month&m=2024-01&scope=all", "не вносились"},
 		{"/journal?object=1&year=2024", "показаний нет"},
+		{"/journal?object=1&year=2024", "jt-ribbon"},
+		{"/?object=1", "home-top"},
+		{"/?object=1", "jt-ribbon"},
 	}
 	for _, c := range cases {
 		rr := request(t, h, http.MethodGet, c.path, nil, "")
@@ -234,6 +237,43 @@ func TestCSVExport(t *testing.T) {
 	}
 	if !strings.Contains(string(body), "Показания") {
 		t.Fatal("нет заголовков CSV")
+	}
+}
+
+func TestChargesCSVExport(t *testing.T) {
+	_, _, h := newTestServer(t)
+	now := model.PeriodOf(time.Now())
+	target := "/export.csv?object=1&kind=charges&from=" +
+		strconv.Itoa(now.Year) + "-01&to=" + strconv.Itoa(now.Year) + "-12"
+	rr := request(t, h, http.MethodGet, target, nil, "")
+	if rr.Code != http.StatusOK {
+		t.Fatalf("код %d", rr.Code)
+	}
+	if !strings.Contains(rr.Header().Get("Content-Type"), "text/csv") {
+		t.Fatalf("Content-Type = %q", rr.Header().Get("Content-Type"))
+	}
+	if !strings.Contains(rr.Body.String(), "Лицевой счёт") {
+		t.Fatal("нет заголовка начислений")
+	}
+}
+
+// Диапазон заменяет ленту месяцев полями «с — по», а выбор года её сохраняет.
+func TestJournalRangeReplacesRibbon(t *testing.T) {
+	_, _, h := newTestServer(t)
+	rr := request(t, h, http.MethodGet,
+		"/journal?object=1&from=2026-03&to=2026-08", nil, "")
+	if rr.Code != http.StatusOK {
+		t.Fatalf("код %d", rr.Code)
+	}
+	body := rr.Body.String()
+	if strings.Contains(body, `class="jt-ribbon"`) {
+		t.Fatal("в режиме диапазона лента месяцев не должна показываться")
+	}
+	if !strings.Contains(body, "jrange-custom") {
+		t.Fatal("в режиме диапазона нет полей «с — по»")
+	}
+	if !strings.Contains(body, "Показать") {
+		t.Fatal("в режиме диапазона нет кнопки «Показать»")
 	}
 }
 
