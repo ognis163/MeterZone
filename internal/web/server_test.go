@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -306,6 +307,31 @@ func TestJournalMonthKeepsRibbonAndPick(t *testing.T) {
 	}
 	if !strings.Contains(body, `class="mpick-item is-on"`) {
 		t.Fatal("в списке месяцев не отмечен выбранный")
+	}
+}
+
+// Список месяцев идёт от новых к старым: над выбранным — будущее,
+// под ним — прошедшее.
+func TestJournalMonthPickOrder(t *testing.T) {
+	_, _, h := newTestServer(t)
+	rr := request(t, h, http.MethodGet,
+		"/journal?object=1&from=2026-03&to=2026-03", nil, "")
+	if rr.Code != http.StatusOK {
+		t.Fatalf("код %d", rr.Code)
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, `data-mpick-list`) {
+		t.Fatal("нет списка месяцев")
+	}
+	found := regexp.MustCompile(`class="mpick-item[^"]*" href="/journal\?from=(\d{4}-\d{2})`).
+		FindAllStringSubmatch(body, -1)
+	if len(found) != 37 {
+		t.Fatalf("месяцев в списке %d, ожидалось 37", len(found))
+	}
+	for i := 1; i < len(found); i++ {
+		if found[i-1][1] <= found[i][1] {
+			t.Fatalf("порядок не от новых к старым: %s, %s", found[i-1][1], found[i][1])
+		}
 	}
 }
 

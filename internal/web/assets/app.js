@@ -994,18 +994,61 @@
   var mPickPop = q("[data-mpick-pop]", mPick);
   var mPickList = q("[data-mpick-list]", mPick);
   if (mPickBtn && mPickPop && mPickList) {
+    // Окно стоит центром на кнопке. Если сверху не хватает места (страница
+    // прокручена), прижимаем его к шапке, чтобы оно не уезжало за экран.
+    var mpPlace = function () {
+      var r = mPickBtn.getBoundingClientRect();
+      var h = mPickPop.offsetHeight;
+      var bar = q(".topbar");
+      var minTop = (bar ? bar.getBoundingClientRect().bottom : 0) + 2;
+      var maxTop = window.innerHeight - h - 8;
+      var top = r.top + r.height / 2 - h / 2;
+      if (top < minTop) top = minTop;
+      if (top > maxTop) top = maxTop;
+      mPickPop.style.transform = "none";
+      mPickPop.style.top = Math.round(top - r.top) + "px";
+    };
+    // Акцент (зелёная строка) идёт за центральной строкой: она же та,
+    // что стоит на месте кнопки и на которую перейдём по тапу.
+    var mpMark = function () {
+      var lr = mPickList.getBoundingClientRect();
+      var mid = lr.top + lr.height / 2;
+      var best = null, dist = 1e9;
+      qa(".mpick-item", mPickList).forEach(function (row) {
+        var r = row.getBoundingClientRect();
+        var d = Math.abs(r.top + r.height / 2 - mid);
+        if (d < dist) { dist = d; best = row; }
+      });
+      qa(".mpick-item.is-center", mPickList).forEach(function (row) {
+        row.classList.remove("is-center");
+      });
+      if (best) best.classList.add("is-center");
+    };
     var mpCenter = function () {
-      var cur = q(".mpick-item.is-on", mPickList) || mPickList.children[24];
+      var cur = q(".mpick-item.is-on", mPickList) ||
+        mPickList.children[Math.floor(mPickList.children.length / 2)];
       if (!cur) return;
       mPickList.style.scrollBehavior = "auto";
       mPickList.scrollTop = cur.offsetTop - (mPickList.clientHeight - cur.offsetHeight) / 2;
       mPickList.style.scrollBehavior = "";
+      mpMark();
     };
     var mpOpen = function (show) {
       mPickPop.hidden = !show;
+      mPick.classList.toggle("is-open", show);
       mPickBtn.setAttribute("aria-expanded", show ? "true" : "false");
-      if (show) window.requestAnimationFrame(mpCenter);
+      if (!show) return;
+      mpPlace();
+      window.requestAnimationFrame(mpCenter);
     };
+    var mpRaf = 0;
+    mPickList.addEventListener("scroll", function () {
+      if (mpRaf) return;
+      mpRaf = window.requestAnimationFrame(function () {
+        mpRaf = 0;
+        mpMark();
+      });
+    }, { passive: true });
     mPickBtn.addEventListener("click", function (e) {
       e.stopPropagation();
       mpOpen(mPickPop.hidden);
@@ -1017,7 +1060,9 @@
       if (e.key === "Escape") mpOpen(false);
     });
     window.addEventListener("resize", function () {
-      if (!mPickPop.hidden) mpCenter();
+      if (mPickPop.hidden) return;
+      mpPlace();
+      mpCenter();
     });
   }
 

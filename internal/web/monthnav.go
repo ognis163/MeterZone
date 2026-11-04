@@ -29,7 +29,9 @@ type periodPick struct {
 }
 
 // buildPeriodPick собирает список вокруг якорного месяца: два года назад и
-// год вперёд. current помечает выбранный месяц — на нём список открывается.
+// год вперёд. Список идёт от новых месяцев к старым: над выбранным месяцем
+// в окне видны будущие, под ним — прошедшие. current помечает выбранный
+// месяц — на нём список открывается.
 func buildPeriodPick(anchor, current model.Period, label string, href func(model.Period) string) periodPick {
 	if !anchor.Valid() {
 		anchor = model.PeriodNow(nil)
@@ -38,7 +40,9 @@ func buildPeriodPick(anchor, current model.Period, label string, href func(model
 	if pick.Label == "" {
 		pick.Label = anchor.Label()
 	}
-	for _, p := range model.MonthsBetween(anchor.Add(-24), anchor.Add(12)) {
+	months := model.MonthsBetween(anchor.Add(-24), anchor.Add(12))
+	for i := len(months) - 1; i >= 0; i-- {
+		p := months[i]
 		pick.Months = append(pick.Months, periodPickMonth{
 			Label:   p.MonthName(),
 			Year:    p.Year,
