@@ -143,6 +143,15 @@ docker run -d --name meterzone -p 8099:8099 -v "$PWD/data:/data" \
 она переживает обновление образа. Для Synology удобнее
 `docker-compose.yml` из того же репозитория.
 
+Обновление — тот же образ под новым тегом (версия в теге: `1.5.7`, `1.5.5`…):
+
+```sh
+docker compose pull && docker compose up -d
+```
+
+Команды для Synology DSM (включая откат и обновление без интернета) —
+в [deploy/INSTALL_Docker_DSM.md](deploy/INSTALL_Docker_DSM.md).
+
 Все параметры задаются переменными: `PORT`, `HOST`, `APP_DB`,
 `APP_BACKUP_DIR`, `APP_TZ`. В контейнере порт меняется только снаружи
 (`PORT_FIXED=1` отключает смену порта из интерфейса, иначе приложение

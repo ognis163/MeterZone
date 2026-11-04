@@ -1,24 +1,22 @@
-# MeterZone на Synology DSM (Container Manager).
+# MeterZone на Synology DSM / любом Linux с Docker.
 #
-# 1. Положите папку проекта в /volume1/docker/meterzone
-# 2. Container Manager → Проект → Создать → путь /volume1/docker/meterzone
-# 3. Готово: http://<адрес NAS>:8099
+# ВАЖНО: перед первым запуском создайте рядом с этим файлом папку data —
+# Synology не создаёт её автоматически, и контейнер упадёт с ошибкой
+#   Bind mount failed: '/volume1/.../data' does not exist
 #
-# База и резервные копии остаются в ./data рядом с этим файлом
-# и не теряются при пересборке и обновлении образа.
+# Образ уже готов и скачивается с GitHub: компилировать нечего.
+# Этот же файл лежит в репозитории ognis163/meterzone-dist.
 
 services:
   meterzone:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/ognis163/meterzone-dist:latest
     restart: unless-stopped
 
     ports:
       - "8099:8099"
 
     environment:
-      # Часовой пояс. Замените на свой, если он другой.
+      # Часовой пояс — замените на свой, если он другой.
       TZ: Europe/Astrakhan
       APP_TZ: Europe/Astrakhan
 
@@ -29,14 +27,13 @@ services:
       APP_DB: /data/meterzone.db
       APP_BACKUP_DIR: /data/backups
 
-      # В контейнере порт меняется только здесь, а не из интерфейса:
-      # иначе приложение «уедет» на порт, который наружу не проброшен.
+      # Порт задаётся здесь, а не из интерфейса приложения.
       PORT_FIXED: "1"
 
-      # Раскомментируйте, если нужен доступ не из локальной сети
-      # (например, через внешний адрес или VPN с публичным IP).
+      # Раскомментируйте для доступа не только из локальной сети.
       # ALLOW_PUBLIC: "1"
 
+    # Папка data должна существовать заранее (см. заголовок файла).
     volumes:
       - ./data:/data
 
